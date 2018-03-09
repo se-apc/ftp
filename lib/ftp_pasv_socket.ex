@@ -62,10 +62,9 @@ defmodule FtpPasvSocket do
     the socket, as it expects that the socket will be closed and handled by whatever function is using the socket at the time
     of the abort. This just updates the `aborted` key of the `state`.
     """
-    def handle_call({:close_data_socket, :abort}, _from, state=%{socket: socket, ftp_data_pid: ftp_data_pid, aborted: _aborted, server_name: server_name}) do
+    def handle_call({:close_data_socket, :abort}, _from, state) do
         logger_debug "Closing Data Socket (due to abort command)..."
-        new_state = %{socket: socket, ftp_data_pid: ftp_data_pid, aborted: true, server_name: server_name}
-        {:reply, state, new_state}
+        {:reply, state, %{state | aborted: true}}
     end
 
     
@@ -73,9 +72,9 @@ defmodule FtpPasvSocket do
     Handler that is called when a client runs the "ls" command. This handler actually sends the data back to the client when in "active" mode has
     been selected
     """
-    def handle_cast({:list, file_info} , state) do
+    def handle_cast({:list, file_info}, state = %{socket: socket}) do
         logger_debug "Sending result from LIST command... -- #{inspect state}"
-        Map.get(state, :socket) |> :gen_tcp.send(file_info)
+        :gen_tcp.send(socket, file_info)
         logger_debug "Result from LIST command sent. Sent #{inspect file_info}"
         message_ftp_data(:socket_transfer_ok)
         message_ftp_data(:close_pasv_socket)
@@ -86,7 +85,7 @@ defmodule FtpPasvSocket do
     @doc """
     Handler that is called when a client runs the "put" command. This handler is the top level when a client wants to upload a file in "passive" mode
     """
-    def handle_cast({:stor, to_path} , state=%{socket: socket, ftp_data_pid: _ftp_data_pid, aborted: _aborted, server_name: _server_name}) do
+    def handle_cast({:stor, to_path}, state = %{socket: socket}) do
         logger_debug "Receiving file..."
         Kernel.send(self(), {:recv, socket, to_path})
         {:noreply, state}
@@ -96,10 +95,10 @@ defmodule FtpPasvSocket do
     @doc """
     Handler that is called when a client runs the "get" command. This handler is the top level when sending a file to the client in "passive" mode
     """
-    def handle_cast({:retr, file, new_offset} , state) do
+    def handle_cast({:retr, file, new_offset}, state = %{socket: socket}) do
         file_info = transfer_info(file, @chunk_size, new_offset)
         logger_debug "Sending file (#{inspect file_info})..."
-        Map.get(state, :socket) |> send_file(file, file_info, new_offset, @chunk_size, 1)
+        send_file(socket, file, file_info, new_offset, @chunk_size, 1)
         {:noreply, state}
     end
 
@@ -109,8 +108,7 @@ defmodule FtpPasvSocket do
     is finished executing, it makes a call to this handler, which in turn will call the send function again, provided the data transfer
     has not been aborted.
     """
-    def handle_info({:send, {socket, file, file_info, new_offset, bytes, transmission_number}}, state) do
-        aborted = Map.get(state, :aborted)
+    def handle_info({:send, {socket, file, file_info, new_offset, bytes, transmission_number}}, state = %{aborted: aborted}) do
         case aborted do
           false ->
             send_file(socket, file, file_info, new_offset, bytes, transmission_number)

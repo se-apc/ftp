@@ -17,7 +17,7 @@ defmodule FtpLogger do
         {:ok, _pid} = GenServer.start_link(__MODULE__, %{debug: debug, log_file: log_file, machine: machine, server_name: server_name}, name: name)
     end
 
-    def init(state = %{debug: _debug, log_file: log_file, machine: machine, server_name: _server_name}) do
+    def init(state = %{log_file: log_file, machine: machine}) do
         Logger.info "Started Logger"
         case machine do ## check to see if we're on a Desktop
             :desktop -> 
