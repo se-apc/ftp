@@ -62,8 +62,10 @@ defmodule FtpServer do
     require Logger
     use GenServer
 
-    def start_link(ref, socket, transport, _opts = [%{ftp_auth_pid: ftp_auth_pid, ftp_logger_pid: ftp_logger_pid, ftp_data_pid: ftp_data_pid, root_dir: root_dir, username: username, password: password, ip: ip, port: port, debug: debug, timeout: timeout, restart_time: restart_time, server_name: server_name, limit_viewable_dirs: limit_viewable_dirs}]) do
-        initial_state = %{ftp_auth_pid: ftp_auth_pid, ftp_logger_pid: ftp_logger_pid, ftp_data_pid: ftp_data_pid, root_dir: root_dir, username: username, password: password, ip: ip, port: port, debug: debug, timeout: timeout, restart_time: restart_time, listener_ref: ref, control_socket: socket, transport: transport, server_name: server_name, limit_viewable_dirs: limit_viewable_dirs}
+    def start_link(ref, socket, transport, _opts = [options]) do
+        initial_state = options
+            |> Map.put(:control_socket, socket)
+            |> Map.put(:transport, transport)
         pid  = :proc_lib.spawn_link(__MODULE__, :init, [ref, socket, transport, initial_state])
         {:ok, pid}
     end
