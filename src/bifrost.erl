@@ -267,7 +267,7 @@ ftp_command(Socket, State, Command, RawArg) ->
     end.
 
 ftp_command(Mod, Socket, State, quit, _) ->
-    respond(Socket, 200, "Goodbye."),
+    respond(Socket, 221, "Goodbye."),
     Mod:disconnect(State),
     quit;
 
@@ -1505,7 +1505,7 @@ quit_test() ->
                                           ok
                                   end),
                       login_test_user(ControlPid,
-                                      [{"QUIT", "200 Goodbye.\r\n"}]),
+                                      [{"QUIT", "221 Goodbye.\r\n"}]),
                       step(ControlPid),
                       finish(ControlPid)
               end
