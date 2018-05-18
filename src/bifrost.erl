@@ -622,8 +622,8 @@ ftp_command(Mod, Socket, State, size, Arg) ->
     case Mod:size(Arg) of
         {ok, FileSize} -> respond(Socket, 213, FileSize);
         {error, _Error} -> respond(Socket, 550)
-    end,    
-    {ok, State}.
+    end,
+    {ok, State};
 
 ftp_command(_, Socket, State, Command, _Arg) ->
     error_logger:warning_report({bifrost, unrecognized_command, Command}),
