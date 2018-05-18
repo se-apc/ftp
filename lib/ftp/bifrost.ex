@@ -467,14 +467,14 @@ defmodule Ftp.Bifrost do
             permissions: permissions,
             root_dir: root_dir,
             current_directory: current_directory
-          },
+          } = state,
           path
         ) do
       working_path = determine_path(root_dir, current_directory, path)
   
       case encode_file_info(permissions, working_path) do
-        nil -> {:error, :not_found}
-        info -> {:ok, info[:size]}
+        nil -> {"-1", state}
+        info -> {Tuple.to_list(info) |> Enum.at(6) |> to_string(), state}
       end
     end
 
