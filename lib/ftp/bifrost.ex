@@ -474,7 +474,7 @@ defmodule Ftp.Bifrost do
   
       case encode_file_info(permissions, working_path) do
         nil -> {"-1", state}
-        info -> {Tuple.to_list(info) |> Enum.at(6) |> to_string(), state}
+        info -> {info |> elem(6) |> to_string(), state}
       end
     end
 
