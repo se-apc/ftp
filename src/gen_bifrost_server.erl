@@ -21,6 +21,7 @@ behaviour_info(callbacks) ->
      {change_directory, 2}, % State, Path -> State Change
      {list_files, 2}, % State, Path -> [FileInfo] OR {error, State}
      {remove_directory, 2}, % State, Path -> State Change
+     {size, 2}, % State, Path -> {FileSize, State}
      {remove_file, 2}, % State, Path -> State Change
      {put_file, 4}, % State, File Name, (append OR write), Fun(Byte Count) -> State Change
      {get_file, 2}, % State, Path -> {ok, Fun(Byte Count)} OR error

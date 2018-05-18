@@ -454,6 +454,30 @@ defmodule Ftp.Bifrost do
     end
   end
 
+    # State, Path -> {ok, Size} OR {error, ErrorCause}
+    def size(connection_state() = conn_state, path) do
+      conn_state
+      |> unpack_state()
+      |> size(to_string(path))
+      |> pack_state(conn_state)
+    end
+  
+    def size(
+          %State{
+            permissions: permissions,
+            root_dir: root_dir,
+            current_directory: current_directory
+          } = state,
+          path
+        ) do
+      working_path = determine_path(root_dir, current_directory, path)
+  
+      case encode_file_info(permissions, working_path) do
+        nil -> {"-1", state}
+        info -> {info |> elem(6) |> to_string(), state}
+      end
+    end
+
   # State, From Path, To Path -> State Change
   def rename_file(_state, _from, _to) do
     {:error, :not_supported}
