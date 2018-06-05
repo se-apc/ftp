@@ -254,8 +254,7 @@ defmodule Ftp do
       password: "pass"
     ]
 
-    current_path = Path.absname("")
-    root = Path.absname("") <> "/_tmp_server"
+    root = Path.absname("") <> "/tmp/ftp_root"
     File.mkdir_p!(root)
     start_server(:sample, "127.0.0.1", 2525, root, opts)
   end
