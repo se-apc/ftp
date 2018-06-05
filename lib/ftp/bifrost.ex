@@ -84,8 +84,8 @@ defmodule Ftp.Bifrost do
     |> pack_state(conn_state)
   end
 
-  def login(%State{authentication_function: authentication_function} = state, username, password)
-      when is_function(authentication_function, 2) do
+  def login(%State{authentication_function: authentication_function} = state, username, password, ip_address)
+      when is_function(authentication_function, 3) do
     case authentication_function.(username, password) do
       {:ok, session, user} ->
         {true, %{state | session: session, user: user}}
@@ -464,7 +464,6 @@ defmodule Ftp.Bifrost do
       |> size(to_string(path))
       |> pack_state(conn_state)
     end
-  
 
     def size(
           %State{
@@ -475,7 +474,6 @@ defmodule Ftp.Bifrost do
           path
         ) do
       working_path = determine_path(root_dir, current_directory, path)
-  
 
       case encode_file_info(permissions, working_path) do
         nil -> {"-1", state}
