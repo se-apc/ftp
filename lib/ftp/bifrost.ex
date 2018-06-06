@@ -87,8 +87,11 @@ defmodule Ftp.Bifrost do
   def login(%State{authentication_function: authentication_function} = state, username, password, ip_address)
       when is_function(authentication_function, 3) do
     case authentication_function.(username, password, ip_address) do
-      {:ok, session, user} -> {true, %{state | session: session, user: user}}
-      {:error, :invalid_password} -> {false, state}
+      {:ok, session, user} ->
+        {true, %{state | session: session, user: user}}
+      {:error, error} ->
+        Logger.debug("Failed to log in. Reason: #{error}")
+        {false, state}
     end
   end
 
