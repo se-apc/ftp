@@ -99,7 +99,8 @@ defmodule Ftp.Bifrost do
         %State{expected_username: expected_username, expected_password: expected_password} =
           state,
         username,
-        password
+        password,
+        _ip_address
       ) do
     case {username, password} do
       {^expected_username, ^expected_password} -> {true, %{state | user: expected_username}}
