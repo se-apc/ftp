@@ -1,4 +1,20 @@
 defmodule Ftp.EventDispatcher do
+  @moduledoc """
+  Below are all of the events that can be dispatched by the FTP server. Table was drawn here: https://ozh.github.io/ascii-tables/
+
+  //========================[]=========================================================================\\
+  ||         Event          ||                       Cases For Event Generation                        ||
+  |]========================[]=========================================================================[|
+  || :e_transfer_started    || Whenever a send/receive file transfer begins                            ||
+  || :e_transfer_failed     || When a send/receive file transfer fails                                 ||
+  || :e_transfer_successful || When a send/receive file transfer is successful                         ||
+  || :e_login_failed        || When a user fails to log in                                             ||
+  || :e_login_successful    || When a user successfully logs in                                        ||
+  || :e_logout_failed       || When a user fails to log out                                            ||
+  || :e_logout_successful   || When a user successfully logs out, or control connection is terminated. ||
+  \\========================[]=========================================================================//
+
+  """
   @server_name __MODULE__
   require Logger
 

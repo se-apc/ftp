@@ -169,6 +169,7 @@ control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
                     {ok, quit}
             end;
         {error, _Reason} ->
+            'Elixir.Ftp.EventDispatcher':dispatch(e_logout_successful),
             error_logger:warning_report({bifrost, connection_terminated})
     end.
 
