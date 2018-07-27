@@ -13,7 +13,7 @@ defmodule Ftp.Permissions do
   `root_path` string from the `current_path` string. If not, it will simply return
   the original `current_path`
   """
-  def allowed_to_read(
+  def allowed_to_read?(
         %__MODULE__{root_dir: root_dir, viewable_dirs: viewable_dirs, enabled: enabled} =
           permissions,
         current_path
@@ -40,13 +40,13 @@ defmodule Ftp.Permissions do
         current_path
       ) do
     list =
-      for item <- viewable_dirs do
-        dir = elem(item, 0)
-        dir = Path.join([root_dir, dir])
-        is_within_directory(dir, current_path)
-      end
-      ## filter out all of the `true` values in the list
-      |> Enum.filter(fn x -> x == true end)
+    for item <- viewable_dirs do
+      dir = elem(item, 0)
+      dir = Path.join([root_dir, dir])
+      is_within_directory(dir, current_path)
+    end
+    ## filter out all of the `true` values in the list
+    |> Enum.filter(fn x -> x == true end)
 
     case list do
       ## if no `true` values were returned (i.e. empty list), then `current_path` is not readable
@@ -67,18 +67,18 @@ defmodule Ftp.Permissions do
         current_path
       ) do
     list =
-      for {dir, access} <- viewable_dirs do
-        case access do
-          :rw ->
-            dir = Path.join([root_dir, dir])
-            is_within_directory(dir, current_path)
+    for {dir, access} <- viewable_dirs do
+      case access do
+        :rw ->
+          dir = Path.join([root_dir, dir])
+          is_within_directory(dir, current_path)
 
-          :ro ->
-            false
-        end
+        :ro ->
+          false
       end
-      ## filter out all of the `true` values in the list
-      |> Enum.filter(fn x -> x == true end)
+    end
+    ## filter out all of the `true` values in the list
+    |> Enum.filter(fn x -> x == true end)
 
     case list do
       ## if no `true` values were returned (i.e. empty list), then `current_path` is not writeable
@@ -107,8 +107,8 @@ defmodule Ftp.Permissions do
   @doc """
   Function used to determine if a user is allowed to write to the `current_path`
   """
-  def allowed_to_write(
-        %__MODULE__{root_dir: root_dir, viewable_dirs: viewable_dirs, enabled: enabled} =
+  def allowed_to_write?(
+        %__MODULE__{root_dir: root_dir, viewable_dirs: _viewable_dirs, enabled: enabled} =
           permissions,
         current_path
       ) do
@@ -125,8 +125,8 @@ defmodule Ftp.Permissions do
   @doc """
   Function used to determine if a user is allowed to write a file in the the `file_path`
   """
-  def allowed_to_stor(%__MODULE__{} = permissions, file_path) do
-    allowed_to_write(permissions, Path.dirname(file_path))
+  def allowed_to_stor?(%__MODULE__{} = permissions, file_path) do
+    allowed_to_write?(permissions, Path.dirname(file_path))
   end
 
   @doc """
@@ -150,43 +150,4 @@ defmodule Ftp.Permissions do
     end
   end
 
-  @doc """
-  Function to remove the hidden folders from the returned list from `File.ls` command,
-  and only show the files specified in the `limit_viewable_dirs` struct.
-  """
-  def remove_hidden_folders(
-        %__MODULE__{root_dir: root_dir, viewable_dirs: viewable_dirs} = permissions,
-        path,
-        files
-      ) do
-    files =
-      for file <- files do
-        ## prepend the root_dir to each file
-        Path.join([path, file])
-      end
-
-    viewable_dirs =
-      for item <- viewable_dirs do
-        file = elem(item, 0)
-        ## prepend the root_dir to each viewable path
-        Path.join([root_dir, file])
-      end
-
-    list =
-      for viewable_dir <- viewable_dirs do
-        for file <- files do
-          case file == String.trim_leading(file, viewable_dir) do
-            true ->
-              nil
-
-            ## remove the prepended `path` (and `\`) from the file so we can return the original file
-            false ->
-              String.trim_leading(file, path) |> String.trim_leading("/")
-          end
-        end
-      end
-
-    ## flatten list and remove the `nil` values from the list
-    List.flatten(list) |> Enum.filter(fn x -> x != nil end)
-  end
 end
