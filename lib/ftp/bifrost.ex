@@ -5,7 +5,6 @@ defmodule Ftp.Bifrost do
   @behaviour :gen_bifrost_server
 
   import Ftp.Path
-  import Ftp.Permissions
 
   require Record
   require Logger
@@ -30,7 +29,9 @@ defmodule Ftp.Bifrost do
               user: nil,
               permissions: nil,
               abort_agent: nil,
-              offset: 0
+              offset: 0,
+              file_handler: nil,
+              server_name: nil
   end
 
   # State is required to be a record, with our own state nested inside.
@@ -150,8 +151,8 @@ defmodule Ftp.Bifrost do
       ) do
     working_path = determine_path(root_dir, current_directory, path)
     path_exists = File.exists?(working_path)
-    have_read_access = allowed_to_read(permissions, working_path)
-    have_write_access = allowed_to_write(permissions, working_path)
+    have_read_access = allowed_to_read?(permissions, working_path, state)
+    have_write_access = allowed_to_write?(permissions, working_path, state)
 
     cond do
       path_exists == true ->
@@ -195,7 +196,7 @@ defmodule Ftp.Bifrost do
 
     path_exists = File.exists?(working_path)
     is_directory = File.dir?(working_path)
-    have_read_access = allowed_to_read(permissions, working_path)
+    have_read_access = allowed_to_read?(permissions, working_path, state)
 
     cond do
       is_directory == false ->
@@ -248,7 +249,7 @@ defmodule Ftp.Bifrost do
       end
 
     for file <- files,
-        info = encode_file_info(permissions, file |> Path.absname(working_path)),
+        info = encode_file_info(permissions, file |> Path.absname(working_path), state),
         info != nil do
       info
     end
@@ -273,8 +274,8 @@ defmodule Ftp.Bifrost do
     working_path = determine_path(root_dir, current_directory, path)
     path_exists = File.exists?(working_path)
     is_directory = File.dir?(working_path)
-    have_read_access = allowed_to_read(permissions, working_path)
-    have_write_access = allowed_to_write(permissions, working_path)
+    have_read_access = allowed_to_read?(permissions, working_path, state)
+    have_write_access = allowed_to_write?(permissions, working_path, state)
 
     cond do
       is_directory == false ->
@@ -314,8 +315,8 @@ defmodule Ftp.Bifrost do
     working_path = determine_path(root_dir, current_directory, path)
     path_exists = File.exists?(working_path)
     is_directory = File.dir?(working_path)
-    have_read_access = allowed_to_read(permissions, working_path)
-    have_write_access = allowed_to_write(permissions, working_path)
+    have_read_access = allowed_to_read?(permissions, working_path, state)
+    have_write_access = allowed_to_write?(permissions, working_path, state)
 
     cond do
       is_directory == true ->
@@ -356,7 +357,7 @@ defmodule Ftp.Bifrost do
       ) do
     working_path = determine_path(root_dir, current_directory, filename)
 
-    if allowed_to_stor(permissions, working_path) do
+    if allowed_to_stor?(permissions, working_path, state) do
       Logger.debug("working_dir: #{working_path}")
 
       case File.exists?(working_path) do
@@ -433,7 +434,7 @@ defmodule Ftp.Bifrost do
 
     path_exists = File.exists?(working_path)
     is_directory = File.dir?(working_path)
-    have_read_access = allowed_to_read(permissions, working_path)
+    have_read_access = allowed_to_read?(permissions, working_path, state)
 
     cond do
       is_directory == true ->
@@ -467,12 +468,12 @@ defmodule Ftp.Bifrost do
           permissions: permissions,
           root_dir: root_dir,
           current_directory: current_directory
-        },
+        } = state,
         path
       ) do
     working_path = determine_path(root_dir, current_directory, path)
 
-    case encode_file_info(permissions, working_path) do
+    case encode_file_info(permissions, working_path, state) do
       nil -> {:error, :not_found}
       info -> {:ok, info}
     end
@@ -496,7 +497,7 @@ defmodule Ftp.Bifrost do
       ) do
     working_path = determine_path(root_dir, current_directory, path)
 
-    case encode_file_info(permissions, working_path) do
+    case encode_file_info(permissions, working_path, state) do
       nil -> {"-1", state}
       info -> {info |> elem(6) |> to_string(), state}
     end
@@ -527,7 +528,7 @@ defmodule Ftp.Bifrost do
   # Helpers
   #
 
-  def encode_file_info(permissions, file) do
+  def encode_file_info(permissions, file, state) do
     case File.stat(file) do
       {:ok, %{type: type, mtime: mtime, access: _, size: size}} ->
         type =
@@ -540,11 +541,11 @@ defmodule Ftp.Bifrost do
 
         mode =
           cond do
-            allowed_to_write(permissions, file) ->
+            allowed_to_write?(permissions, file, state) ->
               # :read_write
               0o600
 
-            allowed_to_read(permissions, file) ->
+            allowed_to_read?(permissions, file, state) ->
               # :read
               0o400
           end
@@ -612,5 +613,65 @@ defmodule Ftp.Bifrost do
 
   def aborted?(%State{abort_agent: abort_agent}) when is_pid(abort_agent) do
     Agent.get(abort_agent, fn abort -> abort end)
+  end
+
+  defp allowed_to_read?(permissions, working_path, %State{file_handler: file_handler, server_name: name}) do
+    if file_handler == Ftp.Permissions do
+      Ftp.Permissions.allowed_to_read?(permissions, working_path)
+    else
+      file_handler.allowed_to_read?(working_path, name)
+    end
+  end
+
+  defp allowed_to_write?(permissions, working_path, %State{file_handler: file_handler, server_name: name}) do
+    if file_handler == Ftp.Permissions do
+      Ftp.Permissions.allowed_to_write?(permissions, working_path)
+    else
+      file_handler.allowed_to_write?(working_path, name)
+    end
+  end
+
+  defp allowed_to_stor?(permissions, working_path, state) do
+    allowed_to_write?(permissions, working_path, state)
+  end
+
+  @doc """
+  Function to remove the hidden folders from the returned list from `File.ls` command,
+  and only show the files specified in the `limit_viewable_dirs` struct.
+  """
+  def remove_hidden_folders(
+        %{root_dir: root_dir, viewable_dirs: viewable_dirs} = permissions,
+        path,
+        files
+      ) do
+    files =
+      for file <- files do
+        ## prepend the root_dir to each file
+        Path.join([path, file])
+      end
+
+    viewable_dirs =
+      for item <- viewable_dirs do
+        file = elem(item, 0)
+        ## prepend the root_dir to each viewable path
+        Path.join([root_dir, file])
+      end
+
+    list =
+      for viewable_dir <- viewable_dirs do
+        for file <- files do
+          case file == String.trim_leading(file, viewable_dir) do
+            true ->
+              nil
+
+            ## remove the prepended `path` (and `\`) from the file so we can return the original file
+            false ->
+              String.trim_leading(file, path) |> String.trim_leading("/")
+          end
+        end
+      end
+
+    ## flatten list and remove the `nil` values from the list
+    List.flatten(list) |> Enum.filter(fn x -> x != nil end)
   end
 end

@@ -50,6 +50,7 @@ defmodule Ftp do
     log_file_directory = options[:log_file_directory] || "/var/system/priv/log/ftp"
     debug = options[:debug] || 2
     authentication_function = options[:authentication_function] || nil
+    file_handler = options[:file_handler] || Ftp.Permissions
 
     machine = get_machine_type()
 
@@ -72,7 +73,8 @@ defmodule Ftp do
           machine: machine,
           server_name: name,
           limit_viewable_dirs: limit_viewable_dirs,
-          authentication_function: authentication_function
+          authentication_function: authentication_function,
+          file_handler: file_handler
         )
 
       error ->
