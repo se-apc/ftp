@@ -108,8 +108,7 @@ defmodule Ftp.Bifrost do
   end
 
   def login(
-        %State{expected_username: expected_username, expected_password: expected_password} =
-          state,
+        %State{expected_username: expected_username, expected_password: expected_password} = state,
         username,
         password,
         _ip_address
@@ -118,6 +117,7 @@ defmodule Ftp.Bifrost do
       {^expected_username, ^expected_password} ->
         Ftp.EventDispatcher.dispatch(:e_login_successful)
         {true, %{state | user: expected_username}}
+
       _ ->
         Ftp.EventDispatcher.dispatch(:e_login_failed)
         {false, state}
@@ -357,7 +357,7 @@ defmodule Ftp.Bifrost do
       ) do
     working_path = determine_path(root_dir, current_directory, filename)
 
-    if allowed_to_stor?(permissions, working_path, state) do
+    if allowed_to_write?(permissions, working_path, state) do
       Logger.debug("working_dir: #{working_path}")
 
       case File.exists?(working_path) do
@@ -366,6 +366,7 @@ defmodule Ftp.Bifrost do
       end
 
       Ftp.EventDispatcher.dispatch(:e_transfer_started)
+
       case receive_file(working_path, mode, recv_data) do
         :ok ->
           Ftp.EventDispatcher.dispatch(:e_transfer_successful)
@@ -589,8 +590,11 @@ defmodule Ftp.Bifrost do
         :eof ->
           Ftp.EventDispatcher.dispatch(:e_transfer_successful)
           {:done, state}
-        {:ok, bytes} -> {:ok, bytes, &send_file(state, file, &1)}
-        {:error, _} -> 
+
+        {:ok, bytes} ->
+          {:ok, bytes, &send_file(state, file, &1)}
+
+        {:error, _} ->
           Ftp.EventDispatcher.dispatch(:e_transfer_failed)
           {:done, state}
       end
@@ -615,7 +619,10 @@ defmodule Ftp.Bifrost do
     Agent.get(abort_agent, fn abort -> abort end)
   end
 
-  defp allowed_to_read?(permissions, working_path, %State{file_handler: file_handler, server_name: name}) do
+  defp allowed_to_read?(permissions, working_path, %State{
+         file_handler: file_handler,
+         server_name: name
+       }) do
     if file_handler == Ftp.Permissions do
       Ftp.Permissions.allowed_to_read?(permissions, working_path)
     else
@@ -623,7 +630,10 @@ defmodule Ftp.Bifrost do
     end
   end
 
-  defp allowed_to_write?(permissions, working_path, %State{file_handler: file_handler, server_name: name}) do
+  defp allowed_to_write?(permissions, working_path, %State{
+         file_handler: file_handler,
+         server_name: name
+       }) do
     if file_handler == Ftp.Permissions do
       Ftp.Permissions.allowed_to_write?(permissions, working_path)
     else
@@ -631,16 +641,12 @@ defmodule Ftp.Bifrost do
     end
   end
 
-  defp allowed_to_stor?(permissions, working_path, state) do
-    allowed_to_write?(permissions, working_path, state)
-  end
-
   @doc """
   Function to remove the hidden folders from the returned list from `File.ls` command,
   and only show the files specified in the `limit_viewable_dirs` struct.
   """
   def remove_hidden_folders(
-        %{root_dir: root_dir, viewable_dirs: viewable_dirs} = permissions,
+        %{root_dir: root_dir, viewable_dirs: viewable_dirs},
         path,
         files
       ) do

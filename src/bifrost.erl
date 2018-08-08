@@ -628,8 +628,8 @@ ftp_command(_Mod, Socket, State, opts, Arg) ->
 
 ftp_command(Mod, Socket, State, size, Arg) ->
     case Mod:size(State, Arg) of
-        {FileSize, _State} -> respond(Socket, 213, FileSize);
-        {"-1", _State} -> respond(Socket, 550) % error
+      {"-1", _State} -> respond(Socket, 550); % error
+      {FileSize, _State} -> respond(Socket, 213, FileSize)
     end,
     {ok, State};
 

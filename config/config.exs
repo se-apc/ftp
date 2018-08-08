@@ -35,13 +35,12 @@ config :ftp,
   ro_dirs: ["/home/alan/Development"],
   rw_dirs: ["/home/alan/Development/ftp"]
 
-config :ftp, :events,
-  [
-    :e_transfer_started,
-    :e_transfer_failed,
-    :e_transfer_successful,
-    :e_login_failed,
-    :e_login_successful,
-    :e_logout_failed,
-    :e_logout_successful,
-  ]
+config :ftp, :events, [
+  :e_transfer_started,
+  :e_transfer_failed,
+  :e_transfer_successful,
+  :e_login_failed,
+  :e_login_successful,
+  :e_logout_failed,
+  :e_logout_successful
+]

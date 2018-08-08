@@ -1,4 +1,4 @@
-defmodule PropertyTests do
+defmodule PropertyTest do
   use PropCheck.StateM
   use PropCheck
   use ExUnit.Case, async: false
@@ -39,6 +39,7 @@ defmodule PropertyTests do
             State: #{inspect(state, pretty: true)}
             Result: #{inspect(result, pretty: true)}
             RanchInfo: #{inspect(:ranch.info(), pretty: true)}
+            Commands Run: #{length(history)}
             """)
           )
           |> aggregate(command_names(cmds))
@@ -133,6 +134,10 @@ defmodule PropertyTests do
     :ftp.user(pid, 'baduser', 'pass')
   end
 
+  def get_unknown_file(pid) do
+    :ftp.recv_bin(pid, "not_a_real_file.txt")
+  end
+
   def command({:off, _}) do
     {:call, __MODULE__, :start_server, []}
   end
@@ -165,7 +170,8 @@ defmodule PropertyTests do
       {:call, :ftp, :mkdir, [pid, dirname()]},
       {:call, :ftp, :pwd, [pid]},
       {:call, __MODULE__, :stop_server, []},
-      {:call, __MODULE__, :receive_with_offset, [pid, a_file_with_offset(data)]}
+      {:call, __MODULE__, :receive_with_offset, [pid, a_file_with_offset(data)]},
+      {:call, __MODULE__, :get_unknown_file, [pid]}
     ])
   end
 
@@ -204,6 +210,12 @@ defmodule PropertyTests do
   def precondition(
         {:authenticated, _},
         {:call, __MODULE__, :receive_with_offset, [_, _]}
+      ),
+      do: true
+
+  def precondition(
+        {:authenticated, _},
+        {:call, __MODULE__, :get_unknown_file, [_]}
       ),
       do: true
 
@@ -343,6 +355,23 @@ defmodule PropertyTests do
     false
   end
 
+  def postcondition(
+        _,
+        {:call, __MODULE__, :get_unknown_file, [_]},
+        {:ok, _bin}
+      ) do
+    IO.puts("received unknown file")
+    false
+  end
+
+  def postcondition(
+        _,
+        {:call, __MODULE__, :get_unknown_file, [_]},
+        {:error, _}
+      ) do
+    true
+  end
+
   def postcondition({:authenticated, %{pwd: pwd}}, {:call, :ftp, :delete, [pid, filename]}, :ok) do
     case :ftp.recv_bin(pid, pwd ++ filename) do
       {:error, :epath} ->
@@ -473,5 +502,19 @@ defmodule PropertyTests do
   def postcondition(previous_state, command, result) do
     IO.puts("default failure #{inspect([previous_state, command, result])} ")
     false
+  end
+
+  def receive_event(event, message) do
+    receive do
+      {:ftp_event, ^event} ->
+        true
+
+      _ ->
+        receive_event(event, message)
+    after
+      1000 ->
+        IO.puts("#{event} never received: #{message}")
+        false
+    end
   end
 end
