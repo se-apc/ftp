@@ -67,14 +67,15 @@ defmodule Ftp.Permissions do
       ) do
     ## filter out all of the `true` values in the list
     list =
-    for {dir, access} <- viewable_dirs do
-      case access do
-        :rw ->
-          dir = Path.join([root_dir, dir])
-          is_within_directory(dir, current_path)
+      for {dir, access} <- viewable_dirs do
+        case access do
+          :rw ->
+            dir = Path.join([root_dir, dir])
+            is_within_directory(dir, current_path)
 
-        :ro ->
-          false
+          :ro ->
+            false
+        end
       end
       |> Enum.filter(fn x -> x == true end)
 
