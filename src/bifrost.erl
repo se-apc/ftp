@@ -91,6 +91,12 @@ get_socket_addr(Socket) ->
             Addr
     end.
 
+get_socket_client_addr(Socket) ->
+    case inet:peername(Socket) of
+        {ok, {Addr, _}} -> Addr;
+        {error, _Error} -> nil
+    end.
+
 listen_socket(Port, TcpOpts) ->
     gen_tcp:listen(Port, TcpOpts).
 
@@ -324,8 +330,9 @@ ftp_command(_, Socket, State, port, Arg) ->
             respond(Socket, 452, "Error parsing address.")
     end;
 
-ftp_command(Mod, Socket, State, pass, Arg) ->
-    case Mod:login(State, State#connection_state.user_name, Arg) of
+ftp_command(Mod, {_SocketMod, RawSocket} = Socket, State, pass, Arg) ->
+    ClientIpAddress = get_socket_client_addr(RawSocket),
+    case Mod:login(State#connection_state{client_ip_address=ClientIpAddress}, State#connection_state.user_name, Arg) of
         {true, NewState} ->
             respond(Socket, 230),
             {ok, NewState#connection_state{authenticated_state=authenticated}};

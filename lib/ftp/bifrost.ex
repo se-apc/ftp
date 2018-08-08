@@ -81,7 +81,7 @@ defmodule Ftp.Bifrost do
   end
 
   # State, Username, Password -> {true OR false, State}
-  def login(connection_state(ip_address: ip_address) = conn_state, username, password) do
+  def login(connection_state(client_ip_address: ip_address) = conn_state, username, password) do
     conn_state
     |> unpack_state()
     |> login(to_string(username), to_string(password), ip_address)
