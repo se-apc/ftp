@@ -331,8 +331,8 @@ ftp_command(_, Socket, State, port, Arg) ->
     end;
 
 ftp_command(Mod, {_SocketMod, RawSocket} = Socket, State, pass, Arg) ->
-    Client_Ip_Address = get_socket_client_addr(RawSocket),
-    case Mod:login(State#connection_state{client_ip_address=Client_Ip_Address}, State#connection_state.user_name, Arg) of
+    ClientIpAddress = get_socket_client_addr(RawSocket),
+    case Mod:login(State#connection_state{client_ip_address=ClientIpAddress}, State#connection_state.user_name, Arg) of
         {true, NewState} ->
             respond(Socket, 230),
             {ok, NewState#connection_state{authenticated_state=authenticated}};
