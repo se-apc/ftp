@@ -359,7 +359,7 @@ defmodule Ftp.Bifrost do
 
     if allowed_to_write?(permissions, working_path, state) do
       Logger.debug("working_dir: #{working_path}")
-
+      
       case File.exists?(working_path) do
         true -> File.rm(working_path)
         false -> :ok
@@ -375,10 +375,10 @@ defmodule Ftp.Bifrost do
         :error ->
           ## TODO cannot seem to produce this event ##
           Ftp.EventDispatcher.dispatch(:e_transfer_failed)
-          {:error, state}
+          {:error, :e_transfer_failed }
       end
     else
-      {:error, state}
+      {:error, :eacces}
     end
   end
 
