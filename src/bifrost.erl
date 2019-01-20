@@ -154,7 +154,9 @@ establish_control_connection(Socket, InitialState) ->
             ets:insert(Name, {current_connections, NewCurrentConnections}),
             control_loop(none,
                         {gen_tcp, Socket},
-                        InitialState#connection_state{control_socket=Socket, ip_address=IpAddress})
+                        InitialState#connection_state{control_socket=Socket, ip_address=IpAddress}),
+            NewCurrentConnectionsAfterExit = NewCurrentConnections - 1,
+            ets:insert(Name, {current_connections, NewCurrentConnectionsAfterExit})
     end.
 
 control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
