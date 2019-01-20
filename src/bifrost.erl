@@ -134,16 +134,28 @@ supervise_connections(InitialState) ->
     supervise_connections(InitialState).
 
 establish_control_connection(Socket, InitialState) ->
-    respond({gen_tcp, Socket}, 220, "FTP Server Ready"),
-    IpAddress = case InitialState#connection_state.ip_address of
-                    undefined -> get_socket_addr(Socket);
-                    {0, 0, 0, 0} -> get_socket_addr(Socket);
-                    {0, 0, 0, 0, 0, 0} -> get_socket_addr(Socket);
-                    Ip -> Ip
-                end,
-    control_loop(none,
-                 {gen_tcp, Socket},
-                 InitialState#connection_state{control_socket=Socket, ip_address=IpAddress}).
+    ModuleState = InitialState#connection_state.module_state,
+    Name = maps:get(server_name, ModuleState),
+    [{max_connections, MaxConnections}] = ets:lookup(Name, max_connections),
+    [{current_connections, CurrentConnections}] = ets:lookup(Name, current_connections),
+    if 
+        CurrentConnections>=MaxConnections -> 
+            gen_tcp:close(Socket),
+            {error, max_connections_reached}; 
+        true -> 
+            respond({gen_tcp, Socket}, 220, "FTP Server Ready"),
+            IpAddress = case InitialState#connection_state.ip_address of
+                            undefined -> get_socket_addr(Socket);
+                            {0, 0, 0, 0} -> get_socket_addr(Socket);
+                            {0, 0, 0, 0, 0, 0} -> get_socket_addr(Socket);
+                            Ip -> Ip
+                        end,
+            NewCurrentConnections = CurrentConnections + 1,
+            ets:insert(Name, {current_connections, NewCurrentConnections}),
+            control_loop(none,
+                        {gen_tcp, Socket},
+                        InitialState#connection_state{control_socket=Socket, ip_address=IpAddress})
+    end.
 
 control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
     case SocketMod:recv(RawSocket, 0) of
@@ -159,7 +171,7 @@ control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
                                 {done, HookPid} ->
                                     {error, closed}
                             end;
-                       true ->
+                    true ->
                             control_loop(HookPid, Socket, NewState)
                     end;
                 {new_socket, NewState, NewSock} ->

@@ -51,6 +51,7 @@ defmodule Ftp do
     debug = options[:debug] || 2
     authentication_function = options[:authentication_function] || nil
     file_handler = options[:file_handler] || Ftp.Permissions
+    max_connections = options[:max_connections] || 10
 
     machine = get_machine_type()
 
@@ -74,7 +75,8 @@ defmodule Ftp do
           server_name: name,
           limit_viewable_dirs: limit_viewable_dirs,
           authentication_function: authentication_function,
-          file_handler: file_handler
+          file_handler: file_handler,
+          max_connections: max_connections
         )
 
       error ->

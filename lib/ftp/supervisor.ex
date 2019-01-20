@@ -19,6 +19,7 @@ defmodule Ftp.Supervisor do
   end
 
   def start_server(name, options) do
+    :ets.new(name, [:public, :named_table])
     Supervisor.start_child(@server_name, %{
       id: name,
       start: {:bifrost, :start_link, [Ftp.Bifrost, options]}
@@ -34,5 +35,6 @@ defmodule Ftp.Supervisor do
   def stop_server(name) do
     Supervisor.terminate_child(@server_name, name)
     Supervisor.delete_child(@server_name, name)
+    :ets.delete(name)
   end
 end

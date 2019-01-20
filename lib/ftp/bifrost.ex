@@ -31,7 +31,9 @@ defmodule Ftp.Bifrost do
               abort_agent: nil,
               offset: 0,
               file_handler: nil,
-              server_name: nil
+              server_name: nil,
+              max_connections: 0,
+              current_connections: 0
   end
 
   # State is required to be a record, with our own state nested inside.
@@ -77,7 +79,14 @@ defmodule Ftp.Bifrost do
       |> Keyword.put(:expected_username, options[:username])
       |> Keyword.put(:expected_password, options[:password])
 
-    struct(State, options)
+    state = struct(State, options)
+
+    IO.puts("This is serername #{inspect state.server_name}")
+
+    :ets.insert(state.server_name, {:max_connections, state.max_connections})
+    :ets.insert(state.server_name, {:current_connections, state.current_connections})
+
+    state
   end
 
   # State, Username, Password -> {true OR false, State}
