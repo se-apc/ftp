@@ -1,6 +1,7 @@
 defmodule Ftp.Supervisor do
   use Supervisor
   require Logger
+  import Ftp.Utils
 
   @server_name __MODULE__
 
@@ -19,7 +20,7 @@ defmodule Ftp.Supervisor do
   end
 
   def start_server(name, options) do
-    :ets.new(name, [:public, :named_table])
+    unless ets_table_exists?(name), do: :ets.new(name, [:public, :named_table])
     Supervisor.start_child(@server_name, %{
       id: name,
       start: {:bifrost, :start_link, [Ftp.Bifrost, options]}
@@ -35,6 +36,7 @@ defmodule Ftp.Supervisor do
   def stop_server(name) do
     Supervisor.terminate_child(@server_name, name)
     Supervisor.delete_child(@server_name, name)
-    :ets.delete(name)
+    if ets_table_exists?(name), do: :ets.delete(name)
+    :ok
   end
 end

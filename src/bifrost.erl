@@ -16,6 +16,8 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -define(FEATURES, [ "UTF8" ]).
+-define(DEFAULT_MAX_CONNECTIONS, 10).
+-define(DEFAULT_CURRENT_CONNECTIONS, 0).
 
 default(Expr, Default) ->
     case Expr of
@@ -141,8 +143,18 @@ supervise_connections(InitialState) ->
 establish_control_connection(Socket, InitialState) ->
     ModuleState = InitialState#connection_state.module_state,
     Name = maps:get(server_name, ModuleState),
-    [{max_connections, MaxConnections}] = ets:lookup(Name, max_connections),
-    [{current_connections, CurrentConnections}] = ets:lookup(Name, current_connections),
+    [{max_connections, MaxConnections}] = 
+    case ets:whereis(Name) of
+          undefined -> [{max_connections, 10}];
+          _ -> ets:lookup(Name, max_connections)
+    end,
+
+    [{current_connections, CurrentConnections}] = 
+    case ets:whereis(Name) of
+          undefined -> [{current_connections, 0}];
+          _ -> ets:lookup(Name, current_connections)
+    end,
+    
     if 
         CurrentConnections>=MaxConnections -> 
             gen_tcp:close(Socket),
@@ -156,12 +168,19 @@ establish_control_connection(Socket, InitialState) ->
                             Ip -> Ip
                         end,
             NewCurrentConnections = CurrentConnections + 1,
-            ets:insert(Name, {current_connections, NewCurrentConnections}),
+            case ets:whereis(Name) of
+                undefined -> ok;
+                _ -> ets:insert(Name, {current_connections, NewCurrentConnections})
+            end,
             control_loop(none,
                         {gen_tcp, Socket},
                         InitialState#connection_state{control_socket=Socket, ip_address=IpAddress}),
             NewCurrentConnectionsAfterExit = NewCurrentConnections - 1,
-            ets:insert(Name, {current_connections, NewCurrentConnectionsAfterExit})
+            case ets:whereis(Name) of
+                undefined -> ok;
+                _ -> ets:insert(Name, {current_connections, NewCurrentConnectionsAfterExit})
+            end    
+        
     end.
 
 control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
