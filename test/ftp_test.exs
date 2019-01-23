@@ -4,43 +4,43 @@ defmodule FtpTest do
   @server_name :test_server
   @test_addr "127.0.0.1"
   @test_port 7701
-  @max_connections 50
+  @max_sessions 50
 
   setup do
     Application.ensure_started(:ftp)
   end
 
-  test "Try to connect max_connections times, expect all connections to be successful" do
+  test "Try to connect max_sessions times, expect all connections to be successful" do
     start_server()
 
     ## Will return a list containing value of {:ok, pid} or {:error, error}
-    results = for _x <- 1..@max_connections, do: :ftp.open(to_charlist(@test_addr), @test_port)
+    results = for _x <- 1..@max_sessions, do: :ftp.open(to_charlist(@test_addr), @test_port)
 
     ## actual_results will be a list of booleans
     {ftp_pids, actual_results} = analyse_results(results)
 
     close_ftp_connections(ftp_pids)
 
-    expected_results = for _x <- 1..@max_connections, do: true
+    expected_results = for _x <- 1..@max_sessions, do: true
 
     stop_server()
 
     assert expected_results == actual_results
   end
 
-  test "Try to connect max_connections+1 times, expect the last time to fail" do
+  test "Try to connect max_sessions+1 times, expect the last time to fail" do
     start_server()
 
     ## Will return a list containing value of {:ok, pid} or {:error, error}
     results =
-      for _x <- 1..(@max_connections + 1), do: :ftp.open(to_charlist(@test_addr), @test_port)
+      for _x <- 1..(@max_sessions + 1), do: :ftp.open(to_charlist(@test_addr), @test_port)
 
     ## actual_results will be a list of booleans
     {ftp_pids, actual_results} = analyse_results(results)
 
     close_ftp_connections(ftp_pids)
 
-    expected_results = for _x <- 1..@max_connections, do: true
+    expected_results = for _x <- 1..@max_sessions, do: true
     ## add last case as a failure
     expected_results = expected_results ++ [false]
 
@@ -77,7 +77,7 @@ defmodule FtpTest do
     opts = [
       username: "user",
       password: "pass",
-      max_connections: @max_connections
+      max_sessions: @max_sessions
     ]
 
     root = Path.absname("") <> "/tmp/ftp_root"

@@ -16,8 +16,8 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -define(FEATURES, [ "UTF8" ]).
--define(DEFAULT_MAX_CONNECTIONS, 10).
--define(DEFAULT_CURRENT_CONNECTIONS, 0).
+-define(DEFAULT_MAX_SESSIONS, 10).
+-define(DEFAULT_CURRENT_SESSIONS, 0).
 
 default(Expr, Default) ->
     case Expr of
@@ -112,7 +112,7 @@ await_connections(Listen, Supervisor) ->
                     case gen_tcp:controlling_process(Socket, Worker) of
                         ok -> ok;
                         
-                        % treat {error, closed} as the case when we close the socket ourselves when max_connections has been reached
+                        % treat {error, closed} as the case when we close the socket ourselves when max_sessions has been reached
                         {error, closed} -> ok
                     end                        
             end;
@@ -143,22 +143,22 @@ supervise_connections(InitialState) ->
 establish_control_connection(Socket, InitialState) ->
     ModuleState = InitialState#connection_state.module_state,
     Name = maps:get(server_name, ModuleState),
-    [{max_connections, MaxConnections}] = 
+    [{max_sessions, MaxSessions}] = 
     case ets:whereis(Name) of
-          undefined -> [{max_connections, ?DEFAULT_MAX_CONNECTIONS}];
-          _ -> ets:lookup(Name, max_connections)
+          undefined -> [{max_sessions, ?DEFAULT_MAX_SESSIONS}];
+          _ -> ets:lookup(Name, max_sessions)
     end,
 
-    [{current_connections, CurrentConnections}] = 
+    [{current_sessions, CurrentSessions}] = 
     case ets:whereis(Name) of
-          undefined -> [{current_connections, ?DEFAULT_CURRENT_CONNECTIONS}];
-          _ -> ets:lookup(Name, current_connections)
+          undefined -> [{current_sessions, ?DEFAULT_CURRENT_SESSIONS}];
+          _ -> ets:lookup(Name, current_sessions)
     end,
     
     if 
-        CurrentConnections>=MaxConnections -> 
+        CurrentSessions>=MaxSessions -> 
             gen_tcp:close(Socket),
-            {error, max_connections_reached}; 
+            {error, max_sessions_reached}; 
         true -> 
             respond({gen_tcp, Socket}, 220, "FTP Server Ready"),
             IpAddress = case InitialState#connection_state.ip_address of
@@ -167,18 +167,18 @@ establish_control_connection(Socket, InitialState) ->
                             {0, 0, 0, 0, 0, 0} -> get_socket_addr(Socket);
                             Ip -> Ip
                         end,
-            NewCurrentConnections = CurrentConnections + 1,
+            NewCurrentSessions = CurrentSessions + 1,
             case ets:whereis(Name) of
                 undefined -> ok;
-                _ -> ets:insert(Name, {current_connections, NewCurrentConnections})
+                _ -> ets:insert(Name, {current_sessions, NewCurrentSessions})
             end,
             control_loop(none,
                         {gen_tcp, Socket},
                         InitialState#connection_state{control_socket=Socket, ip_address=IpAddress}),
-            NewCurrentConnectionsAfterExit = NewCurrentConnections - 1,
+            NewCurrentSessionsAfterExit = NewCurrentSessions - 1,
             case ets:whereis(Name) of
                 undefined -> ok;
-                _ -> ets:insert(Name, {current_connections, NewCurrentConnectionsAfterExit})
+                _ -> ets:insert(Name, {current_sessions, NewCurrentSessionsAfterExit})
             end    
         
     end.
