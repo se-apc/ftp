@@ -6,6 +6,10 @@ defmodule FtpTest do
   @test_port 7701
   @max_connections 50
 
+  setup do
+    Application.ensure_started(:ftp)
+  end
+
   test "Try to connect max_connections times, expect all connections to be successful" do
     start_server()
 
