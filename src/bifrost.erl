@@ -145,13 +145,13 @@ establish_control_connection(Socket, InitialState) ->
     Name = maps:get(server_name, ModuleState),
     [{max_connections, MaxConnections}] = 
     case ets:whereis(Name) of
-          undefined -> [{max_connections, 10}];
+          undefined -> [{max_connections, ?DEFAULT_MAX_CONNECTIONS}];
           _ -> ets:lookup(Name, max_connections)
     end,
 
     [{current_connections, CurrentConnections}] = 
     case ets:whereis(Name) of
-          undefined -> [{current_connections, 0}];
+          undefined -> [{current_connections, ?DEFAULT_CURRENT_CONNECTIONS}];
           _ -> ets:lookup(Name, current_connections)
     end,
     
