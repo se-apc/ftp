@@ -107,7 +107,12 @@ await_connections(Listen, Supervisor) ->
             receive
                 {ack, Worker} ->
                     %% ssl:ssl_accept/2 will return {error, not_owner} otherwise
-                    ok = gen_tcp:controlling_process(Socket, Worker)
+                    case gen_tcp:controlling_process(Socket, Worker) of
+                        ok -> ok;
+                        
+                        % treat {error, closed} as the case when we close the socket ourselves when max_connections has been reached
+                        {error, closed} -> ok
+                    end                        
             end;
         _Error ->
             exit(bad_accept)
