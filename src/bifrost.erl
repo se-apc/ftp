@@ -388,7 +388,7 @@ ftp_command(_, Socket, State, port, Arg) ->
                 respond(Socket, 200),
                 State#connection_state{data_port = {active, Addr, Port}};
             true ->
-                respond(Socket, 452, "Error parsing address1."),
+                respond(Socket, 452, "Error parsing address."),
                 State 
             end,
             {ok, NewState};
