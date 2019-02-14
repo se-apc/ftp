@@ -379,8 +379,19 @@ ftp_command(_, Socket, State, user, Arg) ->
 ftp_command(_, Socket, State, port, Arg) ->
     case parse_address(Arg) of
         {ok, {Addr, Port}} ->
-            respond(Socket, 200),
-            {ok, State#connection_state{data_port = {active, Addr, Port}}};
+            ControlIp = State#connection_state.ip_address,
+            
+            % Here we are preventing a potential bounce attack, by  not allowing any host other than the host the 
+            % the control connection is made on, to open a data connection. Idea  came from here https://seclists.org/bugtraq/1995/Jul/46
+            NewState =             
+            if Addr == ControlIp ->
+                respond(Socket, 200),
+                State#connection_state{data_port = {active, Addr, Port}};
+            true ->
+                respond(Socket, 452, "Error parsing address1."),
+                State 
+            end,
+            {ok, NewState};
         _ ->
             respond(Socket, 452, "Error parsing address.")
     end;
