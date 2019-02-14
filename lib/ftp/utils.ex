@@ -14,6 +14,7 @@ defmodule Ftp.Utils do
           _tid -> true
           end
         rescue
+          ## ets.whereis was only added in OTP 21, so user will get this error if they try to use an older version
           UndefinedFunctionError -> false
         end
     end
