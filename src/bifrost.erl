@@ -256,8 +256,17 @@ data_connection(ControlSocket, State) ->
 
 
 %% passive -- accepts an inbound connection
-establish_data_connection(#connection_state{pasv_listen={passive, Listen, _}}) ->
-    gen_tcp:accept(Listen);
+establish_data_connection(State = #connection_state{pasv_listen={passive, Listen, {Ip, _}}}) ->
+    ControlIp = State#connection_state.ip_address,
+    % Here we are preventing a potential bounce attack, by  not allowing any host other than the host the 
+    % the control connection is made on, to open a data connection. Idea  came from here https://seclists.org/bugtraq/1995/Jul/46
+    if ControlIp == Ip ->
+            % io:fwrite('IPs equal\n'),
+            gen_tcp:accept(Listen);
+           true ->
+            % io:fwrite('IPs do not equal\n'),
+            {error, potential_bounce_attack}
+    end;
 
 %% active -- establishes an outbound connection
 establish_data_connection(#connection_state{data_port={active, Addr, Port}}) ->
