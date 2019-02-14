@@ -13,7 +13,7 @@ defmodule Ftp.Utils do
           :undefined -> false
           _tid -> true
           end
-        catch
+        rescue
           UndefinedFunctionError -> false
         end
     end
