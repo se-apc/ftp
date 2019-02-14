@@ -145,7 +145,7 @@ ets_whereis(TableName) ->
     try
         ets:whereis(TableName)
     catch
-        undef -> undefined
+        error:undef -> undefined
     end.
 
 establish_control_connection(Socket, InitialState) ->
