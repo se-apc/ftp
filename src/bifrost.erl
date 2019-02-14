@@ -265,10 +265,10 @@ data_connection(ControlSocket, State) ->
 
 %% passive -- accepts an inbound connection
 establish_data_connection(State = #connection_state{pasv_listen={passive, Listen, {Ip, _}}}) ->
-    ControlIp = State#connection_state.ip_address,
+    ControlClientIp = State#connection_state.client_ip_address,
     % Here we are preventing a potential bounce attack, by  not allowing any host other than the host the 
     % the control connection is made on, to open a data connection. Idea  came from here https://seclists.org/bugtraq/1995/Jul/46
-    if ControlIp == Ip ->
+    if ControlClientIp == Ip ->
             % io:fwrite('IPs equal\n'),
             gen_tcp:accept(Listen);
            true ->
@@ -379,12 +379,12 @@ ftp_command(_, Socket, State, user, Arg) ->
 ftp_command(_, Socket, State, port, Arg) ->
     case parse_address(Arg) of
         {ok, {Addr, Port}} ->
-            ControlIp = State#connection_state.ip_address,
+            ControlClientIp = State#connection_state.client_ip_address,
             
             % Here we are preventing a potential bounce attack, by  not allowing any host other than the host the 
             % the control connection is made on, to open a data connection. Idea  came from here https://seclists.org/bugtraq/1995/Jul/46
             NewState =             
-            if Addr == ControlIp ->
+            if Addr == ControlClientIp ->
                 respond(Socket, 200),
                 State#connection_state{data_port = {active, Addr, Port}};
             true ->
