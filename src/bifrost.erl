@@ -140,17 +140,25 @@ supervise_connections(InitialState) ->
     end,
     supervise_connections(InitialState).
 
+% need because ets:whereis was not added until OTP 21
+ets_whereis(TableName) -> 
+    try
+        ets:whereis(TableName)
+    catch
+        undef -> undefined
+    end.
+
 establish_control_connection(Socket, InitialState) ->
     ModuleState = InitialState#connection_state.module_state,
     Name = maps:get(server_name, ModuleState),
     [{max_sessions, MaxSessions}] = 
-    case ets:whereis(Name) of
+    case ets_whereis(Name) of
           undefined -> [{max_sessions, ?DEFAULT_MAX_SESSIONS}];
           _ -> ets:lookup(Name, max_sessions)
     end,
 
     [{current_sessions, CurrentSessions}] = 
-    case ets:whereis(Name) of
+    case ets_whereis(Name) of
           undefined -> [{current_sessions, ?DEFAULT_CURRENT_SESSIONS}];
           _ -> ets:lookup(Name, current_sessions)
     end,
@@ -168,7 +176,7 @@ establish_control_connection(Socket, InitialState) ->
                             Ip -> Ip
                         end,
             NewCurrentSessions = CurrentSessions + 1,
-            case ets:whereis(Name) of
+            case ets_whereis(Name) of
                 undefined -> ok;
                 _ -> ets:insert(Name, {current_sessions, NewCurrentSessions})
             end,
@@ -176,7 +184,7 @@ establish_control_connection(Socket, InitialState) ->
                         {gen_tcp, Socket},
                         InitialState#connection_state{control_socket=Socket, ip_address=IpAddress}),
             NewCurrentSessionsAfterExit = NewCurrentSessions - 1,
-            case ets:whereis(Name) of
+            case ets_whereis(Name) of
                 undefined -> ok;
                 _ -> ets:insert(Name, {current_sessions, NewCurrentSessionsAfterExit})
             end    

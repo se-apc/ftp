@@ -8,9 +8,13 @@ defmodule Ftp.Utils do
     exists or not.
     """
     def ets_table_exists?(name) when is_atom(name) do
-        case :ets.whereis(name) do
+        try do
+          case :ets.whereis(name) do
           :undefined -> false
           _tid -> true
+          end
+        catch
+          UndefinedFunctionError -> false
         end
     end
 end
