@@ -20,7 +20,10 @@ defmodule Ftp.Supervisor do
   end
 
   def start_server(name, options) do
-    unless ets_table_exists?(name), do: :ets.new(name, [:public, :named_table])
+    case ets_table_exists(name) do 
+      {:error, :eexist} -> :ets.new(name, [:public, :named_table])
+      _ -> :ok
+    end
     Supervisor.start_child(@server_name, %{
       id: name,
       start: {:bifrost, :start_link, [Ftp.Bifrost, options]}
@@ -36,7 +39,10 @@ defmodule Ftp.Supervisor do
   def stop_server(name) do
     Supervisor.terminate_child(@server_name, name)
     Supervisor.delete_child(@server_name, name)
-    if ets_table_exists?(name), do: :ets.delete(name)
+    case ets_table_exists(name) do
+      :ok -> :ets.delete(name)
+      _ -> :ok
+    end
     :ok
   end
 end

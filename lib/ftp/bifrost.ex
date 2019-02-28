@@ -82,11 +82,12 @@ defmodule Ftp.Bifrost do
 
     state = struct(State, options)
 
-    if ets_table_exists?(state.server_name) do
-      :ets.insert(state.server_name, {:max_sessions, state.max_sessions})
-      :ets.insert(state.server_name, {:current_sessions, state.current_sessions})
-    else
-      Logger.warn("No ets table of name #{inspect state.server_name}. Limited connections for this FTP server (#{inspect state.server_name}) may not work correctly")
+    case ets_table_exists(state.server_name) do
+      :ok ->
+        :ets.insert(state.server_name, {:max_sessions, state.max_sessions})
+        :ets.insert(state.server_name, {:current_sessions, state.current_sessions})
+      _ ->
+        Logger.warn("No ets table of name #{inspect state.server_name}. Limited connections for this FTP server (#{inspect state.server_name}) may not work correctly")
     end
     state
   end
