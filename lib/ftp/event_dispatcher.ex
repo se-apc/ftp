@@ -62,18 +62,22 @@ defmodule Ftp.EventDispatcher do
     end)
   end
 
-  def dispatch(event) when is_atom(event) do
+  def dispatch(event, server_state \\ %{})
+  def dispatch(event, server_state) when is_atom(event) do
     log_dispatch(event)
+    server_name = Map.get(server_state, :server_name)
 
     Registry.dispatch(@server_name, event, fn entries ->
       for {pid, meta} <- entries do
         Logger.debug(fn -> "=> #{inspect(pid)} #{inspect(meta)}" end)
-        send(pid, {:ftp_event, event})
+        unless server_name == nil do
+          send(pid, {:ftp_event, {event, server_name}})
+        end
       end
     end)
   end
 
-  def dispatch(event) do
+  def dispatch(event, _server_state) do
     Logger.error("Not dispatching event #{inspect(event)}. Event must be in Atom format.")
   end
 end
