@@ -129,7 +129,6 @@ defmodule Ftp.Bifrost do
     case {username, password} do
       {^expected_username, ^expected_password} ->
         Ftp.EventDispatcher.dispatch(:e_login_successful, state)
-        IO.puts("This is state: #{inspect state}")
         {true, %{state | user: expected_username}}
 
       _ ->
