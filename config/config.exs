@@ -10,11 +10,11 @@ use Mix.Config
 
 # You can configure for your application as:
 #
-#     config :ftp, key: :value
+#     config :se_ftp, key: :value
 #
 # And access this configuration in your application as:
 #
-#     Application.get_env(:ftp, :key)
+#     Application.get_env(:se_ftp, :key)
 #
 # Or configure a 3rd-party app:
 #
@@ -29,13 +29,13 @@ config :logger, level: :info
 #
 #     import_config "#{Mix.env}.exs"
 
-config :ftp,
+config :se_ftp,
   username: "user",
   password: "password1",
   ro_dirs: ["/home/alan/Development"],
   rw_dirs: ["/home/alan/Development/ftp"]
 
-config :ftp, :events, [
+config :se_ftp, :events, [
   :e_transfer_started,
   :e_transfer_failed,
   :e_transfer_successful,

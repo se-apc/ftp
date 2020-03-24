@@ -3,7 +3,7 @@ defmodule Ftp.Mixfile do
 
   def project do
     [
-      app: :ftp,
+      app: :se_ftp, #Due to naming collision with erlang's :ftp app we need to keep the name distinctive
       version: "0.1.0",
       elixir: "~> 1.4",
       build_embedded: Mix.env() == :prod,
