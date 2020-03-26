@@ -13,11 +13,13 @@ defmodule Ftp.Bifrost do
   Record.defrecord(
     :file_info,
     Record.extract(:file_info, from: "#{__DIR__}/../../include/bifrost.hrl")
+    # Record.extract(:file_info, from: "/srv/erlang/lib/se_ftp-0.1.0/include/bifrost.hrl")
   )
 
   Record.defrecord(
     :connection_state,
     Record.extract(:connection_state, from: "#{__DIR__}/../../include/bifrost.hrl")
+    # Record.extract(:connection_state, from: "/srv/erlang/lib/se_ftp-0.1.0/include/bifrost.hrl")
   )
 
   defmodule State do
@@ -86,18 +88,31 @@ defmodule Ftp.Bifrost do
       :ok ->
         :ets.insert(state.server_name, {:max_sessions, state.max_sessions})
         :ets.insert(state.server_name, {:current_sessions, state.current_sessions})
+        :ets.insert(state.server_name, {:active_sessions, []})
       _ ->
         Logger.warn("No ets table of name #{inspect state.server_name}. Limited connections for this FTP server (#{inspect state.server_name}) may not work correctly")
     end
     state
   end
 
+  def update_session_table({res, conn_state}) do
+    state = unpack_state(conn_state)
+    if Map.get(state, :session) != nil and Map.get(state, :user) != nil do
+      server_name = Map.get(state, :server_name)
+      [{:active_sessions, current_active_sessions}] = :ets.lookup(server_name, :active_sessions)
+      new_active_sessions = current_active_sessions ++ [conn_state]
+      :ets.insert(server_name, {:active_sessions, new_active_sessions})
+    end
+    {res, conn_state}
+  end
+  
   # State, Username, Password -> {true OR false, State}
   def login(connection_state(client_ip_address: ip_address) = conn_state, username, password) do
     conn_state
     |> unpack_state()
     |> login(to_string(username), to_string(password), ip_address)
     |> pack_state(conn_state)
+    |> update_session_table()
   end
 
   def login(
@@ -535,6 +550,8 @@ defmodule Ftp.Bifrost do
   # State -> State Change
   def disconnect(conn_state) do
     module_state = unpack_state(conn_state)
+    session_id = Ftp.Utils.get_session_id(conn_state)
+    Ftp.Utils.close_session(module_state.server_name, session_id)
     Ftp.EventDispatcher.dispatch(:e_logout_successful, module_state)
     :ok
   end

@@ -222,7 +222,10 @@ control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
             end;
         {error, _Reason} ->
             ModuleState = State#connection_state.module_state,
+            Name = maps:get(server_name, ModuleState),
+            SessionId = maps:get(session, ModuleState),
             'Elixir.Ftp.EventDispatcher':dispatch(e_logout_successful, ModuleState),
+            'Elixir.Ftp.Utils':close_session(Name, SessionId),
             error_logger:warning_report({bifrost, connection_terminated})
     end.
 
