@@ -13,13 +13,11 @@ defmodule Ftp.Bifrost do
   Record.defrecord(
     :file_info,
     Record.extract(:file_info, from: "#{__DIR__}/../../include/bifrost.hrl")
-    # Record.extract(:file_info, from: "/srv/erlang/lib/se_ftp-0.1.0/include/bifrost.hrl")
   )
 
   Record.defrecord(
     :connection_state,
     Record.extract(:connection_state, from: "#{__DIR__}/../../include/bifrost.hrl")
-    # Record.extract(:connection_state, from: "/srv/erlang/lib/se_ftp-0.1.0/include/bifrost.hrl")
   )
 
   defmodule State do
@@ -95,8 +93,12 @@ defmodule Ftp.Bifrost do
     state
   end
 
+  @doc """
+  This function is used add the session information (in this case, `conn_state`) of a given session for a server to the table.
+  """
   def update_session_table({res, conn_state}) do
     state = unpack_state(conn_state)
+    ## only store if there is a valid session_id and user
     if Map.get(state, :session) != nil and Map.get(state, :user) != nil do
       server_name = Map.get(state, :server_name)
       [{:active_sessions, current_active_sessions}] = :ets.lookup(server_name, :active_sessions)
