@@ -81,14 +81,15 @@ defmodule Ftp.Bifrost do
       |> Keyword.put(:expected_password, options[:password])
 
     state = struct(State, options)
+    server_name = Map.get(state, :server_name)
 
-    case ets_table_exists(state.server_name) do
+    case ets_table_exists(server_name) do
       :ok ->
-        :ets.insert(state.server_name, {:max_sessions, state.max_sessions})
-        :ets.insert(state.server_name, {:current_sessions, state.current_sessions})
-        :ets.insert(state.server_name, {:active_sessions, []})
+        :ets.insert(server_name, {:max_sessions, state.max_sessions})
+        :ets.insert(server_name, {:current_sessions, state.current_sessions})
+        :ets.insert(server_name, {:active_sessions, []})
       _ ->
-        Logger.warn("No ets table of name #{inspect state.server_name}. Limited connections for this FTP server (#{inspect state.server_name}) may not work correctly")
+        Logger.warn("No ets table of name #{inspect server_name}. Limited connections for this FTP server (#{inspect server_name}) may not work correctly")
     end
     state
   end
