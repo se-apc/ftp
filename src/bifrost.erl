@@ -191,8 +191,19 @@ establish_control_connection(Socket, InitialState) ->
         
     end.
 
+% Retrieve the session timeout from the state
+get_session_timeout(#{session_timeout := SessionTimeout}) ->
+    timer:minutes(SessionTimeout);
+get_session_timeout(_) ->
+    % This is the default timeout that erlang would provide anyways if gen_tcp:recv/2 was called instead of gen_tcp:recv/3 below
+    infinity.
+
+
 control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
-    case SocketMod:recv(RawSocket, 0) of
+    ModuleState = State#connection_state.module_state,
+    UserMap = maps:get(user, ModuleState),
+    SessionTimeout = get_session_timeout(UserMap),
+    case SocketMod:recv(RawSocket, 0, SessionTimeout) of
         {ok, Input} ->
             {Command, Arg} = parse_input(Input),
             case ftp_command(Socket, State, Command, Arg) of
@@ -220,14 +231,19 @@ control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
                     SocketMod:close(RawSocket),
                     {ok, quit}
             end;
+        {error, timeout} ->
+            end_session(ModuleState),
+            error_logger:error_msg("Timed out due to inactivity");
         {error, _Reason} ->
-            ModuleState = State#connection_state.module_state,
-            Name = maps:get(server_name, ModuleState),
-            SessionId = maps:get(session, ModuleState),
-            'Elixir.Ftp.EventDispatcher':dispatch(e_logout_successful, ModuleState),
-            'Elixir.Ftp.Utils':close_session(Name, SessionId),
+            end_session(ModuleState),
             error_logger:warning_report({bifrost, connection_terminated})
     end.
+
+end_session(ModuleState) ->
+    Name = maps:get(server_name, ModuleState),
+    SessionId = maps:get(session, ModuleState),
+    'Elixir.Ftp.EventDispatcher':dispatch(e_logout_successful, ModuleState),
+    'Elixir.Ftp.Utils':close_session(Name, SessionId).
 
 respond(Socket, ResponseCode) ->
     respond(Socket, ResponseCode, response_code_string(ResponseCode)).
