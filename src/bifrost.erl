@@ -223,27 +223,26 @@ control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
                     control_loop(HookPid, NewSock, NewState);
                 {error, timeout} ->
                     respond(Socket, 412, "Timed out. Closing control connection."),
-                    SocketMod:close(RawSocket),
+                    end_session(State, Socket, e_server_logout_successful),
                     {error, timeout};
                 {error, closed} ->
                     {error, closed};
                 quit ->
-                    SocketMod:close(RawSocket),
-                    {ok, quit}
+                    end_session(State, Socket, e_user_logout_successful)
             end;
         {error, timeout} ->
-            end_session(ModuleState),
-            error_logger:error_msg("Timed out due to inactivity");
+            error_logger:error_msg("Timed out due to inactivity"),
+            end_session(State, Socket, e_server_logout_successful);
         {error, _Reason} ->
-            end_session(ModuleState),
-            error_logger:warning_report({bifrost, connection_terminated})
+            error_logger:warning_report({bifrost, connection_terminated}),
+            end_session(State, Socket, e_server_logout_successful)
     end.
 
-end_session(ModuleState) ->
-    Name = maps:get(server_name, ModuleState),
-    SessionId = maps:get(session, ModuleState),
-    'Elixir.Ftp.EventDispatcher':dispatch(e_logout_successful, ModuleState),
-    'Elixir.Ftp.Utils':close_session(Name, SessionId).
+end_session(State, {SocketMod, RawSocket}, Reason) ->
+    Mod = State#connection_state.module,
+    Mod:disconnect(State, Reason),    
+    SocketMod:close(RawSocket),
+    {ok, quit}.
 
 respond(Socket, ResponseCode) ->
     respond(Socket, ResponseCode, response_code_string(ResponseCode)).
@@ -366,9 +365,8 @@ ftp_command(Socket, State, Command, RawArg) ->
             ftp_command(Mod, Socket, State, Command, Arg)
     end.
 
-ftp_command(Mod, Socket, State, quit, _) ->
+ftp_command(_Mod, Socket, _State, quit, _) ->
     respond(Socket, 221, "Goodbye."),
-    Mod:disconnect(State),
     quit;
 
 ftp_command(_, Socket, State, pasv, _) ->

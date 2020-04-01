@@ -29,6 +29,6 @@ behaviour_info(callbacks) ->
      {rename_file, 3}, % State, From Path, To Path -> State Change
      {site_command, 3}, % State, Command Name String, Command Args String -> State Change
      {site_help, 1}, % State -> {ok, [HelpInfo]} OR {error, State}
-     {disconnect, 1}]; % State -> State Change
+     {disconnect, 2}]; % State -> State Change
 behaviour_info(_) ->
     undefined.
