@@ -25,14 +25,14 @@ handle_info({new_connection, Acceptor, Socket}, InitialState) ->
     {noreply, InitialState};
 
 handle_info({'EXIT', _Pid, normal}, State) ->
-    {noreply, normal, State};
+    {noreply, State};
 
 handle_info({'EXIT', _Pid, shutdown}, State) ->
-    {noreply, shutdown, State};
+    {noreply, State};
 
 handle_info({'EXIT', Pid, Info}, State) ->
     error_logger:error_msg("Control connection ~p crashed: ~p~n", [Pid, Info]),
-    {noreply, bad_exit, State};
+    {noreply, State};
 
 handle_info(_, State) ->
     {noreply, State}.
