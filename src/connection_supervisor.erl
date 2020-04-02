@@ -11,6 +11,7 @@ start_link([Args]) ->
     gen_server:start_link(?MODULE, Args, []).
 
 init(InitialState) ->
+    process_flag(trap_exit, true),
     {ok, InitialState}.  
 
 handle_call(_Request, _From, State) ->
