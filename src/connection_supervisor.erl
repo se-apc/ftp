@@ -14,8 +14,7 @@ init(InitialState) ->
     {ok, InitialState}.  
 
 handle_call(_Request, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State}.
+    {reply, ok, State}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -26,14 +25,14 @@ handle_info({new_connection, Acceptor, Socket}, InitialState) ->
     {noreply, InitialState};
 
 handle_info({'EXIT', _Pid, normal}, State) ->
-    {stop, normal, State};
+    {noreply, normal, State};
 
 handle_info({'EXIT', _Pid, shutdown}, State) ->
-    {stop, shutdown, State};
+    {noreply, shutdown, State};
 
 handle_info({'EXIT', Pid, Info}, State) ->
     error_logger:error_msg("Control connection ~p crashed: ~p~n", [Pid, Info]),
-    {stop, bad_exit, State};
+    {noreply, bad_exit, State};
 
 handle_info(_, State) ->
     {noreply, State}.
