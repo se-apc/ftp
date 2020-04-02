@@ -58,9 +58,7 @@ init([HookModule, Opts]) ->
                                              ssl_cert=SslCert,
                                              ssl_ca_cert=CaSslCert,
                                              utf8=UTF8},
-            Supervisor = proc_lib:spawn_link(?MODULE,
-                                             supervise_connections,
-                                             [HookModule:init(InitialState, Opts)]),
+            {ok, Supervisor} = connection_supervisor:start_link([HookModule:init(InitialState, Opts)]),
             proc_lib:spawn_link(?MODULE,
                                 await_connections,
                                 [Listen, Supervisor]),
@@ -120,25 +118,6 @@ await_connections(Listen, Supervisor) ->
             exit(bad_accept)
     end,
     await_connections(Listen, Supervisor).
-
-supervise_connections(InitialState) ->
-    process_flag(trap_exit, true),
-    receive
-        {new_connection, Acceptor, Socket} ->
-            Worker = proc_lib:spawn_link(?MODULE,
-                                         establish_control_connection,
-                                         [Socket, InitialState]),
-            Acceptor ! {ack, Worker};
-        {'EXIT', _Pid, normal} -> % not a crash
-            ok;
-        {'EXIT', _Pid, shutdown} -> % manual termination, not a crash
-            ok;
-        {'EXIT', Pid, Info} ->
-            error_logger:error_msg("Control connection ~p crashed: ~p~n", [Pid, Info]);
-        _ ->
-            ok
-    end,
-    supervise_connections(InitialState).
 
 % need because ets:whereis was not added until OTP 21
 ets_whereis(TableName) -> 
