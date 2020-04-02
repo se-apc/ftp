@@ -78,8 +78,12 @@ defmodule Ftp.Utils do
     """
     @spec close_port(port(), binary()) :: :ok | tuple()
     def close_port(port, session_id) when is_port(port) and is_binary(session_id) do
-      Logger.info("Closing port #{inspect port} for session #{inspect session_id}")
-      Port.close(port)
+      case Port.info(port) do
+        nil -> Logger.info("Port #{inspect port} already closed for session #{inspect session_id}")
+        _ -> 
+          Logger.info("Closing port #{inspect port} for session #{inspect session_id}")
+          Port.close(port)
+        end
     end
   
     def close_port(arg1, arg2), do: {:error, :badargs, [arg1, arg2]}

@@ -551,11 +551,11 @@ defmodule Ftp.Bifrost do
   end
 
   # State -> State Change
-  def disconnect(conn_state) do
+  def disconnect(conn_state, logout_reason) do
     module_state = unpack_state(conn_state)
     session_id = Ftp.Utils.get_session_id(conn_state)
     Ftp.Utils.close_session(module_state.server_name, session_id)
-    Ftp.EventDispatcher.dispatch(:e_logout_successful, module_state)
+    Ftp.EventDispatcher.dispatch({logout_reason, [session_id: session_id]}, module_state)
     :ok
   end
 

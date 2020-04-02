@@ -41,6 +41,10 @@ config :se_ftp, :events, [
   :e_transfer_successful,
   :e_login_failed,
   :e_login_successful,
-  :e_logout_failed,
-  :e_logout_successful
+
+  ## user logouts refers to when a user logs themselves out, a server logout refers to when the server logs the user off
+  :e_user_logout_failed,
+  :e_user_logout_successful,
+  :e_server_logout_failed,
+  :e_server_logout_successful
 ]
