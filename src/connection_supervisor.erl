@@ -11,7 +11,6 @@ start_link([Args]) ->
     gen_server:start_link(?MODULE, Args, []).
 
 init(InitialState) ->
-    erlang:monitor(process, self()),
     {ok, InitialState}.  
 
 handle_call(_Request, _From, State) ->
@@ -23,21 +22,7 @@ handle_cast(_Msg, State) ->
 handle_info({new_connection, Acceptor, Socket}, InitialState) ->
     Worker = proc_lib:spawn_link(bifrost, establish_control_connection, [Socket, InitialState]),
             Acceptor ! {ack, Worker},
-    {noreply, InitialState};
+    {noreply, InitialState}.
 
-handle_info({'DOWN', _Ref, process, _Pid, normal}, State) ->
-    {noreply, State};
-
-handle_info({'DOWN', _Ref, process, _Pid, shutdown}, State) ->
-    {noreply, State};
-
-handle_info({'DOWN', _Ref, process, Pid, Info}, State) ->
-    error_logger:error_msg("Control connection ~p crashed: ~p~n", [Pid, Info]),
-    {noreply, State};
-
-handle_info(_, State) ->
-    {noreply, State}.
-
-terminate(Reason, _State) ->
-    error_logger:error_msg("GenServer terminating:  ~p", [Reason]),
+terminate(_Reason, _State) ->
     ok.
