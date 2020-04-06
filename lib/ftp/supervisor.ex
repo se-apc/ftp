@@ -26,7 +26,7 @@ defmodule Ftp.Supervisor do
     end
     Supervisor.start_child(@server_name, %{
       id: name,
-      start: {:bifrost, :start_link, [Ftp.Bifrost, options]}
+      start: {:bifrost, :start_link, [Ftp.Bifrost, options, name]}
     })
   end
 
