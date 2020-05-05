@@ -147,6 +147,7 @@ establish_control_connection(Socket, InitialState) ->
     
     if 
         CurrentSessions>=MaxSessions -> 
+            respond({gen_tcp, Socket}, 421, "Maximum sessions reached"),
             gen_tcp:close(Socket),
             {error, max_sessions_reached}; 
         true -> 
