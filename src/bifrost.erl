@@ -19,6 +19,9 @@
 -define(DEFAULT_MAX_SESSIONS, 10).
 -define(DEFAULT_CURRENT_SESSIONS, 0).
 
+% This is the time (in minutes) the socket will stay open while it is waiting for a username and/or password
+-define(INITIAL_PROMPT_SOCKET_TIMEOUT, 3).
+
 default(Expr, Default) ->
     case Expr of
         undefined ->
@@ -177,9 +180,9 @@ establish_control_connection(Socket, InitialState) ->
 % Retrieve the session timeout from the state
 get_session_timeout(#{session_timeout := SessionTimeout}) ->
     timer:minutes(SessionTimeout);
+% This case will be called when there is no session timeout given, and when the server is wait for the user to enter their username and/or password
 get_session_timeout(_) ->
-    % This is the default timeout that erlang would provide anyways if gen_tcp:recv/2 was called instead of gen_tcp:recv/3 below
-    infinity.
+    timer:minutes(?INITIAL_PROMPT_SOCKET_TIMEOUT).
 
 
 control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
