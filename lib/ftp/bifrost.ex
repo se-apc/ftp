@@ -60,6 +60,13 @@ defmodule Ftp.Bifrost do
     any
   end
 
+  def refresh_session(module_state = %State{session: nil}), do: module_state
+  
+  def refresh_session(module_state = %State{session: session_id}) do
+    Ftp.EventDispatcher.dispatch({:e_session_refresh, [session_id: session_id]}, module_state)
+    module_state
+  end
+
   # State, PropList (options) -> State
   def init(connection_state() = init_state, options) do
     init(options)
@@ -171,6 +178,7 @@ defmodule Ftp.Bifrost do
   def make_directory(connection_state() = conn_state, path) do
     conn_state
     |> unpack_state()
+    |> refresh_session()
     |> make_directory(to_string(path))
     |> pack_state(conn_state)
   end
@@ -207,6 +215,7 @@ defmodule Ftp.Bifrost do
   def change_directory(connection_state() = conn_state, path) do
     conn_state
     |> unpack_state()
+    |> refresh_session()
     |> change_directory(to_string(path))
     |> pack_state(conn_state)
   end
@@ -248,6 +257,7 @@ defmodule Ftp.Bifrost do
   def list_files(connection_state() = conn_state, path) do
     conn_state
     |> unpack_state()
+    |> refresh_session()
     |> list_files(to_string(path))
     |> pack_state(conn_state)
   end
@@ -290,6 +300,7 @@ defmodule Ftp.Bifrost do
   def remove_directory(connection_state() = conn_state, path) do
     conn_state
     |> unpack_state()
+    |> refresh_session()
     |> remove_directory(to_string(path))
     |> pack_state(conn_state)
   end
@@ -331,6 +342,7 @@ defmodule Ftp.Bifrost do
   def remove_file(connection_state() = conn_state, path) do
     conn_state
     |> unpack_state()
+    |> refresh_session()
     |> remove_file(to_string(path))
     |> pack_state(conn_state)
   end
@@ -372,6 +384,7 @@ defmodule Ftp.Bifrost do
   def put_file(connection_state() = conn_state, filename, mode, recv_data) do
     conn_state
     |> unpack_state()
+    |> refresh_session()
     |> put_file(to_string(filename), mode, recv_data)
     |> pack_state(conn_state)
   end
@@ -417,6 +430,7 @@ defmodule Ftp.Bifrost do
   def abort(connection_state() = conn_state, arg) do
     conn_state
     |> unpack_state()
+    |> refresh_session()
     |> abort(to_string(arg))
     |> pack_state(conn_state)
   end
@@ -429,6 +443,7 @@ defmodule Ftp.Bifrost do
   def restart(connection_state() = conn_state, arg) do
     conn_state
     |> unpack_state()
+    |> refresh_session()
     |> restart(to_string(arg))
     |> pack_state(conn_state)
   end
@@ -450,6 +465,7 @@ defmodule Ftp.Bifrost do
   def get_file(connection_state() = conn_state, path) do
     conn_state
     |> unpack_state()
+    |> refresh_session()
     |> get_file(to_string(path))
     |> pack_state(conn_state)
   end
@@ -491,6 +507,7 @@ defmodule Ftp.Bifrost do
   def file_information(connection_state() = conn_state, path) do
     conn_state
     |> unpack_state()
+    |> refresh_session()
     |> file_information(to_string(path))
     |> pack_state(conn_state)
   end
@@ -515,6 +532,7 @@ defmodule Ftp.Bifrost do
   def size(connection_state() = conn_state, path) do
     conn_state
     |> unpack_state()
+    |> refresh_session()
     |> size(to_string(path))
     |> pack_state(conn_state)
   end
