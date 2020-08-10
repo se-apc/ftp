@@ -46,5 +46,8 @@ config :se_ftp, :events, [
   :e_user_logout_failed,
   :e_user_logout_successful,
   :e_server_logout_failed,
-  :e_server_logout_successful
+  :e_server_logout_successful,
+  
+  ## event for when sessions are refreshed
+  :e_session_refresh
 ]

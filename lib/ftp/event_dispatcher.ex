@@ -14,6 +14,7 @@ defmodule Ftp.EventDispatcher do
   || :e_user_logout_successful   || When a user successfully logs out               ||
   || :e_server_logout_failed     || When the server fails to log a user out         ||
   || :e_server_logout_successful || When the server successfully logs a user out    ||
+  || :e_session_refresh          || When a command is run on the FTP server         ||
   \\=============================[]=================================================//
 
   """
