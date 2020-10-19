@@ -32,7 +32,7 @@ defmodule Ftp.Utils do
     @doc """
     Function to return all the active sessions for a given `server_name`.
     """
-    @spec get_active_sessions(atom()) :: list() | nil | tuple()
+    @spec get_active_sessions(any()) :: any()
     def get_active_sessions(server_name) when is_atom(server_name) do
       case ets_lookup(server_name, :active_sessions) do
         [{:active_sessions, active_sessions}] -> active_sessions
@@ -41,11 +41,11 @@ defmodule Ftp.Utils do
     end
 
     def get_active_sessions(arg1), do: {:error, :badargs, [arg1]}
-  
+    
     @doc """
     Function to close a session of id `session_id` of the ftp server `server_name`.
     """
-    @spec close_session(atom(), binary()) :: :ok | tuple()
+    @spec close_session(any(), any()) :: :ok | {:error, :eexist} | {:error, :badargs, [any(), ...]}
     def close_session(server_name, session_id) when is_atom(server_name) and is_binary(session_id) do
       case ets_lookup(server_name, :active_sessions) do
         [{:active_sessions, active_sessions}] -> 
@@ -76,7 +76,7 @@ defmodule Ftp.Utils do
     @doc """
     Function to close the `port` belonging to `session_id`
     """
-    @spec close_port(port(), binary()) :: :ok | tuple()
+    @spec close_port(any(), any()) :: :ok | true | {:error, :badargs, [any(), ...]}
     def close_port(port, session_id) when is_port(port) and is_binary(session_id) do
       case Port.info(port) do
         nil -> Logger.info("Port #{inspect port} already closed for session #{inspect session_id}")
@@ -91,7 +91,7 @@ defmodule Ftp.Utils do
     @doc """
     Utility function to return the `Port` if present in `conn_state`
     """
-    @spec get_port(tuple()) :: port() | nil
+    @spec get_port(any()) :: any()
     def get_port(conn_state) when is_tuple(conn_state) do
       port_index = 15 ## port location in conn_state
       conn_state
@@ -104,7 +104,7 @@ defmodule Ftp.Utils do
     @doc """
     Utility function to return the session from `conn_state`
     """
-    @spec get_session_id(tuple()) :: binary() | nil
+    @spec get_session_id(any()) :: any()
     def get_session_id(conn_state) when is_tuple(conn_state) do
       session_index = 8 ## %Ftp.Bifrost{} struct location in conn_state
       session_state = 

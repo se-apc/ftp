@@ -29,7 +29,14 @@ default(Expr, Default) ->
             Expr
     end.
 
--spec ucs2_to_utf8(string()) -> string().
+-spec ucs2_to_utf8(
+  binary()
+  | maybe_improper_list(
+      binary() | maybe_improper_list(any(), binary() | []) | char(),
+      binary() | []
+    )
+) -> [byte()].
+
 ucs2_to_utf8(String) ->
     erlang:binary_to_list(unicode:characters_to_binary(String, utf8)).
 
