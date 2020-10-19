@@ -5,30 +5,22 @@
 %%%-------------------------------------------------------------------
 
 -module(gen_bifrost_server).
--export([behaviour_info/1]).
 
-behaviour_info(callbacks) ->
-    % Path :: String
-    % State Change :: {ok, State} OR {error, State}
-    % File Name :: String
-    % HelpInfo :: {Name, Description}
-    [{init, 2}, % State, PropList (options) -> State
-     {login, 3}, % State, Username, Password -> {true OR false, State}
-     {abort, 2}, % State, Arg -> State Change
-     {restart, 2}, % State, Arg
-     {current_directory, 1}, % State -> Path
-     {make_directory, 2}, % State, Path -> State Change
-     {change_directory, 2}, % State, Path -> State Change
-     {list_files, 2}, % State, Path -> [FileInfo] OR {error, State}
-     {remove_directory, 2}, % State, Path -> State Change
-     {size, 2}, % State, Path -> {FileSize, State}
-     {remove_file, 2}, % State, Path -> State Change
-     {put_file, 4}, % State, File Name, (append OR write), Fun(Byte Count) -> State Change
-     {get_file, 2}, % State, Path -> {ok, Fun(Byte Count)} OR error
-     {file_information, 2}, % State, Path -> {ok, FileInfo} OR {error, ErrorCause}
-     {rename_file, 3}, % State, From Path, To Path -> State Change
-     {site_command, 3}, % State, Command Name String, Command Args String -> State Change
-     {site_help, 1}, % State -> {ok, [HelpInfo]} OR {error, State}
-     {disconnect, 2}]; % State -> State Change
-behaviour_info(_) ->
-    undefined.
+-callback init(State :: term(), Proplist :: term()) -> NewState :: term().
+-callback login(State :: term(), Username :: binary(), Password :: binary()) -> {boolean(), NewState :: term()}.
+-callback abort(State :: term(), Arg :: term()) -> NewState :: term().
+-callback restart(State :: term(), Arg :: term()) -> NewState :: term().
+-callback current_directory(State :: term()) -> Path :: binary().
+-callback make_directory(State :: term(), Path :: binary()) -> NewState :: term().
+-callback change_directory(State :: term(), Path :: binary()) -> NewState :: term().
+-callback list_files(State :: term(), Path :: binary()) -> [FileInfo :: term()] | {error, NewState :: term()}.
+-callback remove_directory(State :: term(), Path :: binary()) -> NewState :: term().
+-callback size(State :: term(), Path :: binary()) -> {FileSize :: binary(), NewState :: term()}.
+-callback remove_file(State :: term(), Path :: binary()) -> NewState :: term().
+-callback put_file(State :: term(), FileName :: binary(), append | write, FunByteCount :: fun()) ->  NewState :: term().
+-callback get_file(State :: term(), Path :: binary()) -> {ok, FunByteCount :: fun()} | error.
+-callback file_information(State :: term(), Path :: binary()) -> {ok, FileInfo :: term()} | {error, ErrorCause :: term()}.
+-callback rename_file(State :: term(), FromPath :: binary(), ToPath :: binary()) -> NewState :: term().
+-callback site_command(State :: term(), CommandNameString :: binary(), CommandArgsString :: binary()) -> NewState :: term().
+-callback site_help(State :: term()) -> {ok, [HelpInfo :: term()]} | {error, State :: term()}.
+-callback disconnect(State :: term(), Reason :: term()) -> ok.
