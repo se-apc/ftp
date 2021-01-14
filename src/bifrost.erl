@@ -218,15 +218,17 @@ control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
                     end_session(State, Socket, e_server_logout_successful),
                     {error, timeout};
                 {error, closed} ->
+                    error_logger:warning_report({bifrost, connection_terminated, connection_closed}),
                     {error, closed};
                 quit ->
+                    error_logger:warning_report({bifrost, connection_terminated, quit_by_user}),
                     end_session(State, Socket, e_user_logout_successful)
             end;
         {error, timeout} ->
             error_logger:error_msg("Timed out due to inactivity"),
             end_session(State, Socket, e_server_logout_successful);
-        {error, _Reason} ->
-            error_logger:warning_report({bifrost, connection_terminated}),
+        {error, Reason} ->
+            error_logger:error_report({bifrost, connection_terminated, Reason}),
             end_session(State, Socket, e_server_logout_successful)
     end.
 
