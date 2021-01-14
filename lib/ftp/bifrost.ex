@@ -486,13 +486,13 @@ defmodule Ftp.Bifrost do
 
     cond do
       is_directory == true ->
-        :error
+        {:error, :eisdir}
 
       path_exists == false ->
-        :error
+        {:error, :eexist}
 
       have_read_access == false ->
-        :error
+        {:error, :eperm}
 
       true ->
         {:ok, file} = :file.open(working_path, [:read, :binary])

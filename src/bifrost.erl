@@ -215,6 +215,7 @@ control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
                     control_loop(HookPid, NewSock, NewState);
                 {error, timeout} ->
                     respond(Socket, 412, "Timed out. Closing control connection."),
+                    error_logger:error_report({bifrost, connection_terminated, timeout}),
                     end_session(State, Socket, e_server_logout_successful),
                     {error, timeout};
                 {error, closed} ->
@@ -225,7 +226,7 @@ control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
                     end_session(State, Socket, e_user_logout_successful)
             end;
         {error, timeout} ->
-            error_logger:error_msg("Timed out due to inactivity"),
+            error_logger:error_report({bifrost, connection_terminated, inactivity_timeout}),
             end_session(State, Socket, e_server_logout_successful);
         {error, Reason} ->
             error_logger:error_report({bifrost, connection_terminated, Reason}),
@@ -631,13 +632,15 @@ ftp_command(Mod, Socket, State, retr, Arg) ->
                     end),
 
                 {ok, NewState};
-            error ->
-                respond(Socket, 550),
+            {error, Reason} ->
+                error_logger:error_report({bifrost, get_file_failed, Reason, Arg}),
+                respond(Socket, 550, io_lib:format("Get '~s' failed: ~p", [Arg, Reason])),
                 {ok, State}
         end
         catch
-            _ ->
-                respond(Socket, 550),
+            CrashError ->
+                error_logger:error_report({bifrost, get_file_crashed, CrashError, Arg}),
+                respond(Socket, 550, io_lib:format("Get '~s' failed: Unknown", [Arg])),
                 {ok, State}
         end;
 
