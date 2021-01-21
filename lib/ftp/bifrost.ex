@@ -134,11 +134,12 @@ defmodule Ftp.Bifrost do
       when is_function(authentication_function, 3) do
     case authentication_function.(username, password, ip_address) do
       {:ok, session, user} ->
+        Logger.info("#{inspect(username)} successfully logged in.")
         Ftp.EventDispatcher.dispatch(:e_login_successful, state)
         {true, %{state | session: session, user: user}}
 
       {:error, error} ->
-        Logger.debug("Failed to log in. Reason: #{error}")
+        Logger.error("#{inspect(username)} failed to logged in. Reason: #{inspect error}")
         Ftp.EventDispatcher.dispatch(:e_login_failed, state)
         {false, state}
     end
@@ -153,10 +154,12 @@ defmodule Ftp.Bifrost do
       ) do
     case {username, password} do
       {^expected_username, ^expected_password} ->
+        Logger.info("#{inspect(username)} successfully logged in.")
         Ftp.EventDispatcher.dispatch(:e_login_successful, state)
         {true, %{state | user: expected_username}}
 
       _ ->
+        Logger.error("#{inspect(username)} failed to logged in.")
         Ftp.EventDispatcher.dispatch(:e_login_failed, state)
         {false, state}
     end
