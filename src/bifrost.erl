@@ -195,9 +195,11 @@ control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
     ModuleState = State#connection_state.module_state,
     UserMap = maps:get(user, ModuleState),
     SessionTimeout = get_session_timeout(UserMap),
+    SessionInfo = {erlang:self(), UserMap},
     case SocketMod:recv(RawSocket, 0, SessionTimeout) of
         {ok, Input} ->
-            {Command, Arg} = parse_input(Input),
+            Input = {Command, Arg} = parse_input(Input),
+            error_logger:error_report({bifrost, client_request, Input, SessionInfo}),
             case ftp_command(Socket, State, Command, Arg) of
                 {ok, NewState} ->
                     if is_pid(HookPid) =:= false ->
@@ -215,21 +217,21 @@ control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
                     control_loop(HookPid, NewSock, NewState);
                 {error, timeout} ->
                     respond(Socket, 412, "Timed out. Closing control connection."),
-                    error_logger:error_report({bifrost, connection_terminated, timeout}),
+                    error_logger:error_report({bifrost, connection_terminated, timeout, SessionInfo}),
                     end_session(State, Socket, e_server_logout_successful),
                     {error, timeout};
                 {error, closed} ->
-                    error_logger:warning_report({bifrost, connection_terminated, connection_closed}),
+                    error_logger:warning_report({bifrost, connection_terminated, connection_closed, SessionInfo}),
                     {error, closed};
                 quit ->
-                    error_logger:warning_report({bifrost, connection_terminated, quit_by_user}),
+                    error_logger:warning_report({bifrost, connection_terminated, quit_by_user, SessionInfo}),
                     end_session(State, Socket, e_user_logout_successful)
             end;
         {error, timeout} ->
-            error_logger:error_report({bifrost, connection_terminated, inactivity_timeout}),
+            error_logger:error_report({bifrost, connection_terminated, inactivity_timeout, SessionInfo}),
             end_session(State, Socket, e_server_logout_successful);
         {error, Reason} ->
-            error_logger:error_report({bifrost, connection_terminated, Reason}),
+            error_logger:error_report({bifrost, connection_terminated, Reason, SessionInfo}),
             end_session(State, Socket, e_server_logout_successful)
     end.
 
@@ -244,6 +246,7 @@ respond(Socket, ResponseCode) ->
 
 respond({SocketMod, Socket}, ResponseCode, Message) ->
     Line = integer_to_list(ResponseCode) ++ " " ++ ucs2_to_utf8(Message) ++ "\r\n",
+    error_logger:warning_report({bifrost, server_response, Line}),
     SocketMod:send(Socket, Line).
 
 respond_raw({SocketMod, Socket}, Line) ->
