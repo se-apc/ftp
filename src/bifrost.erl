@@ -255,13 +255,13 @@ respond_raw({SocketMod, Socket}, Line) ->
 log_client_request(Request, State) ->
     ModuleState = State#connection_state.module_state,
     UserMap = maps:get(user, ModuleState),
-    SessionInfo = {erlang:self(), UserMap}
+    SessionInfo = {erlang:self(), UserMap},
     error_logger:info_report({bifrost, client_request, Request, SessionInfo}).
 
 log_server_response(Response, State) ->
     ModuleState = State#connection_state.module_state,
     UserMap = maps:get(user, ModuleState),
-    SessionInfo = {erlang:self(), UserMap}
+    SessionInfo = {erlang:self(), UserMap},
     error_logger:info_report({bifrost, server_response, Response, SessionInfo}).
 
 ssl_options(State) ->
