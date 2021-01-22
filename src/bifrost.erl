@@ -199,7 +199,7 @@ control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
     case SocketMod:recv(RawSocket, 0, SessionTimeout) of
         {ok, Input} ->
             Input = {Command, Arg} = parse_input(Input),
-            error_logger:info_report({bifrost, client_request, Input, SessionInfo}),
+            log_client_request(Input, State),
             case ftp_command(Socket, State, Command, Arg) of
                 {ok, NewState} ->
                     if is_pid(HookPid) =:= false ->
@@ -245,15 +245,24 @@ respond(State, Socket, ResponseCode) ->
     respond(State, Socket, ResponseCode, response_code_string(ResponseCode)).
 
 respond(State, {SocketMod, Socket}, ResponseCode, Message) ->
-    ModuleState = State#connection_state.module_state,
-    UserMap = maps:get(user, ModuleState),
-    SessionInfo = {erlang:self(), UserMap},
     Line = integer_to_list(ResponseCode) ++ " " ++ ucs2_to_utf8(Message) ++ "\r\n",
-    error_logger:info_report({bifrost, server_response, Line, SessionInfo}),
+    log_server_response(Line, State),
     SocketMod:send(Socket, Line).
 
 respond_raw({SocketMod, Socket}, Line) ->
     SocketMod:send(Socket, ucs2_to_utf8(Line) ++ "\r\n").
+
+log_client_request(Request, State) ->
+    ModuleState = State#connection_state.module_state,
+    UserMap = maps:get(user, ModuleState),
+    SessionInfo = {erlang:self(), UserMap}
+    error_logger:info_report({bifrost, client_request, Request, SessionInfo}).
+
+log_server_response(Response, State) ->
+    ModuleState = State#connection_state.module_state,
+    UserMap = maps:get(user, ModuleState),
+    SessionInfo = {erlang:self(), UserMap}
+    error_logger:info_report({bifrost, server_response, Response, SessionInfo}).
 
 ssl_options(State) ->
     [{keyfile, State#connection_state.ssl_key},
