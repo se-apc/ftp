@@ -156,11 +156,11 @@ establish_control_connection(Socket, InitialState) ->
     
     if 
         CurrentSessions>=MaxSessions -> 
-            respond({gen_tcp, Socket}, 421, "Maximum sessions reached"),
+            respond(InitialState, {gen_tcp, Socket}, 421, "Maximum sessions reached"),
             gen_tcp:close(Socket),
             {error, max_sessions_reached}; 
         true -> 
-            respond({gen_tcp, Socket}, 220, "FTP Server Ready"),
+            respond(InitialState, {gen_tcp, Socket}, 220, "FTP Server Ready"),
             IpAddress = case InitialState#connection_state.ip_address of
                             undefined -> get_socket_addr(Socket);
                             {0, 0, 0, 0} -> get_socket_addr(Socket);
@@ -216,7 +216,7 @@ control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
                 {new_socket, NewState, NewSock} ->
                     control_loop(HookPid, NewSock, NewState);
                 {error, timeout} ->
-                    respond(Socket, 412, "Timed out. Closing control connection."),
+                    respond(State, Socket, 412, "Timed out. Closing control connection."),
                     error_logger:error_report({bifrost, connection_terminated, timeout, SessionInfo}),
                     end_session(State, Socket, e_server_logout_successful),
                     {error, timeout};
@@ -241,12 +241,15 @@ end_session(State, {SocketMod, RawSocket}, Reason) ->
     SocketMod:close(RawSocket),
     {ok, quit}.
 
-respond(Socket, ResponseCode) ->
-    respond(Socket, ResponseCode, response_code_string(ResponseCode)).
+respond(State, Socket, ResponseCode) ->
+    respond(State, Socket, ResponseCode, response_code_string(ResponseCode)).
 
-respond({SocketMod, Socket}, ResponseCode, Message) ->
+respond(State, {SocketMod, Socket}, ResponseCode, Message) ->
+    ModuleState = State#connection_state.module_state,
+    UserMap = maps:get(user, ModuleState),
+    SessionInfo = {erlang:self(), UserMap},
     Line = integer_to_list(ResponseCode) ++ " " ++ ucs2_to_utf8(Message) ++ "\r\n",
-    error_logger:warning_report({bifrost, server_response, Line}),
+    error_logger:warning_report({bifrost, server_response, Line, SessionInfo}),
     SocketMod:send(Socket, Line).
 
 respond_raw({SocketMod, Socket}, Line) ->
@@ -258,7 +261,7 @@ ssl_options(State) ->
      {cacertfile, State#connection_state.ssl_ca_cert}].
 
 data_connection(ControlSocket, State) ->
-    respond(ControlSocket, 150),
+    respond(State, ControlSocket, 150),
     case establish_data_connection(State) of
         {ok, DataSocket} ->
             case State#connection_state.protection_mode of
@@ -270,12 +273,12 @@ data_connection(ControlSocket, State) ->
                         {ok, SslSocket} ->
                             {ssl, SslSocket};
                         E ->
-                            respond(ControlSocket, 425),
+                            respond(State, ControlSocket, 425),
                             throw({error, E})
                     end
             end;
         {error, Error} ->
-            respond(ControlSocket, 425),
+            respond(State, ControlSocket, 425),
             throw(Error)
     end.
 
@@ -332,7 +335,7 @@ pasv_connection(ControlSocket, State) ->
                                       {Ip, Port}},
                     {P1,P2} = format_port(Port),
                     {S1,S2,S3,S4} = Ip,
-                    respond(ControlSocket,
+                    respond(State, ControlSocket,
                             227,
                             lists:flatten(
                               io_lib:format("Entering Passive Mode (~p,~p,~p,~p,~p,~p)",
@@ -341,7 +344,7 @@ pasv_connection(ControlSocket, State) ->
                     {ok,
                      State#connection_state{pasv_listen=PasvSocketInfo}};
                 {error, _} ->
-                    respond(ControlSocket, 425),
+                    respond(State, ControlSocket, 425),
                     {ok, State}
             end
     end.
@@ -353,18 +356,18 @@ ftp_command(Socket, State, Command, RawArg) ->
     case unicode:characters_to_list(erlang:list_to_binary(RawArg), utf8) of
         { error, List, _RestData } ->
             error_logger:warning_report({bifrost, invalid_utf8, List}),
-            respond(Socket, 501),
+            respond(State, Socket, 501),
             {ok, State};
         { incomplete, List, _Binary } ->
             error_logger:warning_report({bifrost, incomplete_utf8, List}),
-            respond(Socket, 501),
+            respond(State, Socket, 501),
             {ok, State};
         Arg ->
             ftp_command(Mod, Socket, State, Command, Arg)
     end.
 
-ftp_command(_Mod, Socket, _State, quit, _) ->
-    respond(Socket, 221, "Goodbye."),
+ftp_command(_Mod, Socket, State, quit, _) ->
+    respond(State, Socket, 221, "Goodbye."),
     quit;
 
 ftp_command(_, Socket, State, pasv, _) ->
@@ -372,12 +375,12 @@ ftp_command(_, Socket, State, pasv, _) ->
 
 ftp_command(_, {_, RawSocket} = Socket, State, auth, Arg) ->
     if State#connection_state.ssl_allowed =:= false ->
-            respond(Socket, 500),
+            respond(State, Socket, 500),
             {ok, State};
        true ->
             case string:to_lower(Arg) of
                 "tls" ->
-                    respond(Socket, 234, "Command okay."),
+                    respond(State, Socket, 234, "Command okay."),
                     case ssl:ssl_accept(RawSocket,
                                         ssl_options(State)) of
                         {ok, SslSocket} ->
@@ -385,11 +388,11 @@ ftp_command(_, {_, RawSocket} = Socket, State, auth, Arg) ->
                              State#connection_state{ssl_socket=SslSocket},
                              {ssl, SslSocket}};
                         _ ->
-                            respond(Socket, 500),
+                            respond(State, Socket, 500),
                             {ok, State}
                     end;
                 _ ->
-                    respond(Socket, 502, "Unsupported security extension."),
+                    respond(State, Socket, 502, "Unsupported security extension."),
                     {ok, State}
             end
     end;
@@ -399,15 +402,15 @@ ftp_command(_, Socket, State, prot, Arg) ->
                    "c" -> clear;
                    _ -> private
                end,
-    respond(Socket, 200),
+    respond(State, Socket, 200),
     {ok, State#connection_state{protection_mode=ProtMode}};
 
 ftp_command(_, Socket, State, pbsz, "0") ->
-    respond(Socket, 200),
+    respond(State, Socket, 200),
     {ok, State};
 
 ftp_command(_, Socket, State, user, Arg) ->
-    respond(Socket, 331),
+    respond(State, Socket, 331),
     {ok, State#connection_state{user_name=Arg}};
 
 ftp_command(_, Socket, State, port, Arg) ->
@@ -419,26 +422,26 @@ ftp_command(_, Socket, State, port, Arg) ->
             % the control connection is made on, to open a data connection. Idea  came from here https://seclists.org/bugtraq/1995/Jul/46
             NewState =             
             if ClientDataIPAddress == ClientControlIPAddress ->
-                respond(Socket, 200),
+                respond(State, Socket, 200),
                 State#connection_state{data_port = {active, ClientDataIPAddress, ClientDataPort}};
             true ->
                 io:fwrite('Client\'s Data and Control Ips do not match.  Control IP: ~w   Potential Data IP: ~w\n', [ClientControlIPAddress, ClientDataIPAddress]),
-                respond(Socket, 452, "Error parsing address."),
+                respond(State, Socket, 452, "Error parsing address."),
                 State 
             end,
             {ok, NewState};
         _ ->
-            respond(Socket, 452, "Error parsing address.")
+            respond(State, Socket, 452, "Error parsing address.")
     end;
 
 ftp_command(Mod, {_SocketMod, RawSocket} = Socket, State, pass, Arg) ->
     ClientIpAddress = get_socket_client_addr(RawSocket),
     case Mod:login(State#connection_state{client_ip_address=ClientIpAddress}, State#connection_state.user_name, Arg) of
         {true, NewState} ->
-            respond(Socket, 230),
+            respond(State, Socket, 230),
             {ok, NewState#connection_state{authenticated_state=authenticated}};
         _ ->
-            respond(Socket, 530, "Login incorrect."),
+            respond(State, Socket, 530, "Login incorrect."),
             quit
     end;
 
@@ -449,31 +452,31 @@ ftp_command(_Mod, Socket, State, feat, _Arg) ->
                       (Feature) -> respond_raw(Socket, " " ++ Feature)
                 end,
                 ?FEATURES),
-    respond(Socket, 211, "End"),
+    respond(State, Socket, 211, "End"),
     {ok, State};
 
 %% ^^^ from this point down every command requires authentication ^^^
 
 ftp_command(_, Socket, State=#connection_state{authenticated_state=unauthenticated}, _, _) ->
-    respond(Socket, 530),
+    respond(State, Socket, 530),
     {ok, State};
 
 ftp_command(_, Socket, State, rein, _) ->
-    respond(Socket, 200),
+    respond(State, Socket, 200),
     {ok,
      State#connection_state{user_name=none,authenticated_state=unauthenticated}};
 
 ftp_command(Mod, Socket, State, abor, Arg) ->
     case Mod:abort(State, Arg) of
         {ok, NewState} ->
-            respond(Socket, 426),
+            respond(State, Socket, 426),
             {ok, NewState};
         {error, _} ->
             {ok, State}
     end;
 
 ftp_command(Mod, Socket, State, pwd, _) ->
-    respond(Socket, 257, "\"" ++ Mod:current_directory(State) ++ "\""),
+    respond(State, Socket, 257, "\"" ++ Mod:current_directory(State) ++ "\""),
     {ok, State};
 
 ftp_command(Mod, Socket, State, cdup, _) ->
@@ -482,32 +485,32 @@ ftp_command(Mod, Socket, State, cdup, _) ->
 ftp_command(Mod, Socket, State, cwd, Arg) ->
     case Mod:change_directory(State, Arg) of
         {ok, NewState} ->
-            respond(Socket, 250, "directory changed to \"" ++ Mod:current_directory(NewState) ++ "\""),
+            respond(State, Socket, 250, "directory changed to \"" ++ Mod:current_directory(NewState) ++ "\""),
             {ok, NewState};
         {error, _} ->
-            respond(Socket, 550, "Unable to change directory"),
+            respond(State, Socket, 550, "Unable to change directory"),
             {ok, State}
     end;
 
 ftp_command(Mod, Socket, State, mkd, Arg) ->
     case Mod:make_directory(State, Arg) of
         {ok, NewState} ->
-            respond(Socket, 250, "\"" ++ Arg ++ "\" directory created."),
+            respond(State, Socket, 250, "\"" ++ Arg ++ "\" directory created."),
             {ok, NewState};
         {error, _} ->
-            respond(Socket, 550, "Unable to create directory"),
+            respond(State, Socket, 550, "Unable to create directory"),
             {ok, State}
     end;
 
 ftp_command(Mod, Socket, State, nlst, Arg) ->
     case Mod:list_files(State, Arg) of
         {error, NewState} ->
-            respond(Socket, 451),
+            respond(State, Socket, 451),
             {ok, NewState};
         Files ->
             DataSocket = data_connection(Socket, State),
             list_file_names_to_socket(DataSocket, Files),
-            respond(Socket, 226),
+            respond(State, Socket, 226),
             bf_close(DataSocket),
             {ok, State}
     end;
@@ -515,12 +518,12 @@ ftp_command(Mod, Socket, State, nlst, Arg) ->
 ftp_command(Mod, Socket, State, list, Arg) ->
     case Mod:list_files(State, Arg) of
         {error, _} ->
-            respond(Socket, 451),
+            respond(State, Socket, 451),
             {ok, State};
         Files ->
             DataSocket = data_connection(Socket, State),
             list_files_to_socket(DataSocket, Files),
-            respond(Socket, 226),
+            respond(State, Socket, 226),
             bf_close(DataSocket),
             {ok, State}
     end;
@@ -528,24 +531,24 @@ ftp_command(Mod, Socket, State, list, Arg) ->
 ftp_command(Mod, Socket, State, rmd, Arg) ->
     case Mod:remove_directory(State, Arg) of
         {ok, NewState} ->
-            respond(Socket, 200),
+            respond(State, Socket, 200),
             {ok, NewState};
         {error, _} ->
-            respond(Socket, 550),
+            respond(State, Socket, 550),
             {ok, State}
     end;
 
 ftp_command(_, Socket, State, syst, _) ->
-    respond(Socket, 215, "UNIX Type: L8"),
+    respond(State, Socket, 215, "UNIX Type: L8"),
     {ok, State};
 
 ftp_command(Mod, Socket, State, dele, Arg) ->
     case Mod:remove_file(State, Arg) of
         {ok, NewState} ->
-            respond(Socket, 200),
+            respond(State, Socket, 200),
             {ok, NewState};
         {error, _} ->
-            respond(Socket, 450),
+            respond(State, Socket, 450),
             {ok, State}
     end;
 
@@ -561,10 +564,10 @@ ftp_command(Mod, Socket, State, stor, Arg) ->
           end,
     RetState = case Mod:put_file(State, Arg, write, Fun) of
                    {ok, NewState} ->
-                       respond(Socket, 226),
+                       respond(State, Socket, 226),
                        NewState;
                    {error, Info} ->
-                       respond(Socket, 451, io_lib:format("Error ~p when storing a file.", [Info])),
+                       respond(State, Socket, 451, io_lib:format("Error ~p when storing a file.", [Info])),
                        State
                end,
     bf_close(DataSocket),
@@ -573,11 +576,11 @@ ftp_command(Mod, Socket, State, stor, Arg) ->
 ftp_command(_, Socket, State, type, Arg) ->
     case Arg of
         "I" ->
-            respond(Socket, 200);
+            respond(State, Socket, 200);
         "A" ->
-            respond(Socket, 200);
+            respond(State, Socket, 200);
         _->
-            respond(Socket, 501, "Only TYPE I or TYPE A may be used.")
+            respond(State, Socket, 501, "Only TYPE I or TYPE A may be used.")
     end,
     {ok, State};
 
@@ -585,29 +588,29 @@ ftp_command(Mod, Socket, State, site, Arg) ->
     [Command | Sargs] = string:tokens(Arg, " "),
     case Mod:site_command(State, list_to_atom(string:to_lower(Command)), string:join(Sargs, " ")) of
         {ok, NewState} ->
-            respond(Socket, 200),
+            respond(State, Socket, 200),
             {ok, NewState};
         {error, not_found} ->
-            respond(Socket, 500),
+            respond(State, Socket, 500),
             {ok, State};
         {error, _} ->
-            respond(Socket, 501, "Error completing command."),
+            respond(State, Socket, 501, "Error completing command."),
             {ok, State}
     end;
 
 ftp_command(Mod, Socket, State, site_help, _) ->
     case Mod:site_help(State) of
         {ok, []} ->
-            respond(Socket, 500);
+            respond(State, Socket, 500);
         {error, _} ->
-            respond(Socket, 500);
+            respond(State, Socket, 500);
         {ok, Commands} ->
             respond_raw(Socket, "214-The following commands are recognized"),
             lists:map(fun({CmdName, Descr}) ->
                               respond_raw(Socket, CmdName ++ " : " ++ Descr)
                       end,
                       Commands),
-            respond(Socket, 214, "Help OK")
+            respond(State, Socket, 214, "Help OK")
     end,
     {ok, State};
 
@@ -617,7 +620,7 @@ ftp_command(Mod, Socket, State, help, Arg) ->
         "site" ->
             ftp_command(Mod, Socket, State, site_help, undefined);
         _ ->
-            respond(Socket, 500),
+            respond(State, Socket, 500),
             {ok, State}
     end;
 
@@ -630,20 +633,20 @@ ftp_command(Mod, Socket, State, retr, Arg) ->
                     fun () ->
                         DataSocket = data_connection(Socket, State),
                         {ok, _NewState} = write_fun(DataSocket, Fun),
-                        respond(Socket, 226),
+                        respond(State, Socket, 226),
                         bf_close(DataSocket)
                     end),
 
                 {ok, NewState};
             {error, Reason} ->
                 error_logger:error_report({bifrost, get_file_failed, Reason, Arg}),
-                respond(Socket, 550, io_lib:format("Get '~s' failed: ~p", [Arg, Reason])),
+                respond(State, Socket, 550, io_lib:format("Get '~s' failed: ~p", [Arg, Reason])),
                 {ok, State}
         end
         catch
             CrashError ->
                 error_logger:error_report({bifrost, get_file_crashed, CrashError, Arg}),
-                respond(Socket, 550, io_lib:format("Get '~s' failed: Unknown", [Arg])),
+                respond(State, Socket, 550, io_lib:format("Get '~s' failed: Unknown", [Arg])),
                 {ok, State}
         end;
 
@@ -651,45 +654,45 @@ ftp_command(Mod, Socket, State, rest, Arg) ->
     try
         case Mod:restart(State, Arg) of
             {ok, NewState} ->
-                respond(Socket, 350, "Rest Supported. Offset set to " ++ Arg),
+                respond(State, Socket, 350, "Rest Supported. Offset set to " ++ Arg),
                 {ok, NewState};
             error ->
-                respond(Socket, 550),
+                respond(State, Socket, 550),
                 {ok, State}
         end
     catch
         _ ->
-            respond(Socket, 550),
+            respond(State, Socket, 550),
             {ok, State}
     end;
 
 ftp_command(Mod, Socket, State, mdtm, Arg) ->
     case Mod:file_info(State, Arg) of
         {ok, FileInfo} ->
-            respond(Socket,
+            respond(State, Socket,
                     213,
                     format_mdtm_date(FileInfo#file_info.mtime));
         _ ->
-            respond(Socket, 550)
+            respond(State, Socket, 550)
     end,
     {ok, State};
 
 ftp_command(_, Socket, State, rnfr, Arg) ->
-    respond(Socket, 350, "Ready for RNTO."),
+    respond(State, Socket, 350, "Ready for RNTO."),
     {ok, State#connection_state{rnfr=Arg}};
 
 ftp_command(Mod, Socket, State, rnto, Arg) ->
     case State#connection_state.rnfr of
         undefined ->
-            respond(Socket, 503, "RNFR not specified."),
+            respond(State, Socket, 503, "RNFR not specified."),
             {ok, State};
         Rnfr ->
             case Mod:rename_file(State, Rnfr, Arg) of
                 {error, _} ->
-                    respond(Socket, 550),
+                    respond(State, Socket, 550),
                     {ok, State};
                 {ok, NewState} ->
-                    respond(Socket, 250, "Rename successful."),
+                    respond(State, Socket, 250, "Rename successful."),
                     {ok, NewState#connection_state{rnfr=undefined}}
             end
     end;
@@ -717,28 +720,28 @@ ftp_command(_Mod, Socket, State, feat, _Arg) ->
         _ ->
             ok
     end,
-    respond(Socket, 211, "End"),
+    respond(State, Socket, 211, "End"),
     {ok, State};
 
 ftp_command(_Mod, Socket, State, opts, Arg) ->
     case string:to_upper(Arg) of
         "UTF8 ON" when State#connection_state.utf8 =:= true ->
-            respond(Socket, 200, "Accepted");
+            respond(State, Socket, 200, "Accepted");
         _ ->
-            respond(Socket, 501)
+            respond(State, Socket, 501)
     end,
     {ok, State};
 
 ftp_command(Mod, Socket, State, size, Arg) ->
     case Mod:size(State, Arg) of
-      {"-1", _State} -> respond(Socket, 550); % error
-      {FileSize, _State} -> respond(Socket, 213, FileSize)
+      {"-1", _State} -> respond(State, Socket, 550); % error
+      {FileSize, _State} -> respond(State, Socket, 213, FileSize)
     end,
     {ok, State};
 
 ftp_command(_, Socket, State, Command, _Arg) ->
     error_logger:warning_report({bifrost, unrecognized_command, Command}),
-    respond(Socket, 500),
+    respond(State, Socket, 500),
     {ok, State}.
 
 write_fun(Socket, Fun) ->
