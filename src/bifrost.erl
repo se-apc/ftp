@@ -190,12 +190,18 @@ get_session_timeout(#{session_timeout := SessionTimeout}) ->
 get_session_timeout(_) ->
     timer:minutes(?INITIAL_PROMPT_SOCKET_TIMEOUT).
 
+session_info(#{user_name := Username}) ->
+    session_info(Username);
+
+session_info(Username) ->
+    {self(), Username}.
+
 
 control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
     ModuleState = State#connection_state.module_state,
     UserMap = maps:get(user, ModuleState),
     SessionTimeout = get_session_timeout(UserMap),
-    SessionInfo = {self(), UserMap},
+    SessionInfo = session_info(UserMap),
     case SocketMod:recv(RawSocket, 0, SessionTimeout) of
         {ok, Input} ->
             Input = {Command, Arg} = parse_input(Input),
@@ -255,13 +261,13 @@ respond_raw({SocketMod, Socket}, Line) ->
 log_client_request(Request, State) ->
     ModuleState = State#connection_state.module_state,
     UserMap = maps:get(user, ModuleState),
-    SessionInfo = {erlang:self(), UserMap},
+    SessionInfo = session_info(UserMap),
     error_logger:info_report({bifrost, client_request, Request, SessionInfo}).
 
 log_server_response(Response, State) ->
     ModuleState = State#connection_state.module_state,
     UserMap = maps:get(user, ModuleState),
-    SessionInfo = {erlang:self(), UserMap},
+    SessionInfo = session_info(UserMap),
     error_logger:info_report({bifrost, server_response, Response, SessionInfo}).
 
 ssl_options(State) ->
