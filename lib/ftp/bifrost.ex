@@ -10,6 +10,8 @@ defmodule Ftp.Bifrost do
   require Record
   require Logger
 
+  @refresh_loop_for_data_transfer_interval 10_000
+
   Record.defrecord(
     :file_info,
     Record.extract(:file_info, from: "#{__DIR__}/../../include/bifrost.hrl")
@@ -418,17 +420,20 @@ defmodule Ftp.Bifrost do
       end
 
       Ftp.EventDispatcher.dispatch(:e_transfer_started, state)
+      refresh_loop_tref = start_refresh_loop_for_data_transfer(state)
 
       case receive_file(working_path, mode, recv_data) do
         :ok ->
           file_size = File.lstat!(working_path).size
           Logger.info("Received #{inspect(file_size)} bytes from #{inspect(user)} (session_pid: #{inspect(session_pid)}) ::: #{inspect self()}.")
           Ftp.EventDispatcher.dispatch(:e_transfer_successful, state)
+          stop_refresh_loop_for_data_transfer(refresh_loop_tref)
           {:ok, state}
 
         :error ->
           ## TODO cannot seem to produce this event ##
           Ftp.EventDispatcher.dispatch(:e_transfer_failed, state)
+          stop_refresh_loop_for_data_transfer(refresh_loop_tref)
           {:error, :e_transfer_failed}
       end
     else
@@ -510,7 +515,8 @@ defmodule Ftp.Bifrost do
         :file.position(file, state.offset)
         state = set_abort(%{state | offset: 0}, false)
         Ftp.EventDispatcher.dispatch(:e_transfer_started, state)
-        {:ok, &send_file(state, file, file_size, &1), state}
+        refresh_loop_tref = start_refresh_loop_for_data_transfer(state)
+        {:ok, &send_file(state, file, file_size, refresh_loop_tref, &1), state}
     end
   end
 
@@ -647,18 +653,20 @@ defmodule Ftp.Bifrost do
     end
   end
 
-  def send_file(state = %State{user: user, session_pid: session_pid}, file, file_size, size) do
+  def send_file(state = %State{user: user, session_pid: session_pid}, file, file_size, tref, size) do
     unless aborted?(state) do
       case :file.read(file, size) do
         :eof ->
           Logger.info("Sent #{inspect(file_size)} bytes to #{inspect(user)} (session_pid: #{inspect(session_pid)}).")
+          stop_refresh_loop_for_data_transfer(tref)
           Ftp.EventDispatcher.dispatch(:e_transfer_successful, state)
           {:done, state}
 
         {:ok, bytes} ->
-          {:ok, bytes, &send_file(state, file, file_size, &1)}
+          {:ok, bytes, &send_file(state, file, file_size, tref, &1)}
 
         {:error, _} ->
+          stop_refresh_loop_for_data_transfer(tref)
           Ftp.EventDispatcher.dispatch(:e_transfer_failed, state)
           {:done, state}
       end
@@ -743,5 +751,15 @@ defmodule Ftp.Bifrost do
 
     ## flatten list and remove the `nil` values from the list
     List.flatten(list) |> Enum.filter(fn x -> x != nil end)
+  end
+
+  defp start_refresh_loop_for_data_transfer(state) do
+    pid = Process.whereis(Ftp.SessionRefresher)   
+    {:ok, tref} = :timer.send_interval(@refresh_loop_for_data_transfer_interval, pid, {:refresh_session, state})
+    tref
+  end
+
+  defp stop_refresh_loop_for_data_transfer(tref) do
+    :timer.cancel(tref)
   end
 end
