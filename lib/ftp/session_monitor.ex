@@ -29,19 +29,8 @@ defmodule Ftp.SessionMonitor do
     end
 
     def handle_info({:close_socket, socket}, sessions) do
-        Logger.info("Attemping to close socket #{inspect(socket)}...")
-        close_socket(socket)
-        other_sessions =
-        sessions
-        |> Enum.map(fn session = {s, _, ref} ->
-                if s == socket do
-                    Logger.info("Attempting to close socket's ref #{inspect(ref)}...")
-                    cancel_timer(ref)
-                end
-                session
-            end)
-        |> remove_session_from_list(socket)
-        {:noreply, other_sessions}
+        Logger.error("Socket timed-out #{inspect(socket)}")
+        {:noreply, do_close_socket(socket, sessions)}
     end
 
     def handle_cast({:add_session, session = {socket, session_timeout}}, sessions) do
@@ -62,7 +51,7 @@ defmodule Ftp.SessionMonitor do
     end
 
     def handle_cast({:remove_session, socket}, sessions) do
-        handle_info({:close_socket, socket}, sessions)
+        {:noreply, do_close_socket(socket, sessions)}
     end
 
     defp cancel_timer(ref) do
@@ -88,6 +77,20 @@ defmodule Ftp.SessionMonitor do
         else
             Logger.info("Could not close #{inspect(socket)}. nil value")
         end
+    end
+
+    defp do_close_socket(socket, sessions) do
+        Logger.info("Attemping to close socket #{inspect(socket)}...")
+        close_socket(socket)
+        sessions
+        |> Enum.map(fn session = {s, _, ref} ->
+                if s == socket do
+                    Logger.info("Attempting to close socket's ref #{inspect(ref)}...")
+                    cancel_timer(ref)
+                end
+                session
+            end)
+        |> remove_session_from_list(socket)
     end
 
 end
