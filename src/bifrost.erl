@@ -21,6 +21,9 @@
 % This is the time (in minutes) the socket will stay open while it is waiting for a username and/or password
 -define(INITIAL_PROMPT_SOCKET_TIMEOUT, 1).
 
+% Make data transfer timeout excessivily large, but still not infinite.
+-define(DATA_TRANSFER_SOCKET_TIMEOUT, 60).
+
 default(Expr, Default) ->
     case Expr of
         undefined ->
@@ -365,6 +368,18 @@ pasv_connection(ControlSocket, State) ->
             end
     end.
 
+
+% function to restore the old session timeout (found in the state) for the raw socket
+restore_old_socket_timeout({_SocketMod, RawSocket}, State) ->
+    ModuleState = State#connection_state.module_state,
+    UserMap = maps:get(user, ModuleState),
+    OldTimeout = get_session_timeout(UserMap),
+    'Elixir.Ftp.SessionMonitor':update_session({RawSocket, OldTimeout}).
+
+% Function to set a longer socket timeout for when we are transferring data
+set_data_transfer_socket_timeout({_SocketMod, RawSocket}) ->
+    'Elixir.Ftp.SessionMonitor':update_session({RawSocket, timer:minutes(?DATA_TRANSFER_SOCKET_TIMEOUT)}).
+
 %% FTP COMMANDS
 
 ftp_command(Socket, State, Command, RawArg) ->
@@ -569,6 +584,7 @@ ftp_command(Mod, Socket, State, dele, Arg) ->
     end;
 
 ftp_command(Mod, Socket, State, stor, Arg) ->
+    set_data_transfer_socket_timeout(Socket),
     DataSocket = data_connection(Socket, State),
     Fun = fun() ->
                   case bf_recv(DataSocket) of
@@ -587,6 +603,7 @@ ftp_command(Mod, Socket, State, stor, Arg) ->
                        State
                end,
     bf_close(DataSocket),
+    restore_old_socket_timeout(Socket, State),
     {ok, RetState};
 
 ftp_command(_, Socket, State, type, Arg) ->
@@ -647,10 +664,12 @@ ftp_command(Mod, Socket, State, retr, Arg) ->
                 % This must be async in order to abort it
                 spawn_link(
                     fun () ->
+                        set_data_transfer_socket_timeout(Socket),
                         DataSocket = data_connection(Socket, State),
                         {ok, _NewState} = write_fun(DataSocket, Fun),
                         respond(State, Socket, 226),
-                        bf_close(DataSocket)
+                        bf_close(DataSocket),
+                        restore_old_socket_timeout(Socket, State)
                     end),
 
                 {ok, NewState};
