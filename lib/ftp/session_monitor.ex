@@ -36,12 +36,12 @@ defmodule Ftp.SessionMonitor do
     def handle_cast({:add_session, session = {socket, session_timeout}}, sessions) do
         case Enum.filter(sessions, fn {s, _, _} -> s == socket end) do
             [] ->
-                Logger.info("Could not find session: #{inspect(session)}. Will add new one...")
+                #Logger.info("Could not find session: #{inspect(session)}. Will add new one...")
                 ref = Process.send_after(self(), {:close_socket, socket}, session_timeout)
                 new_session = {socket, session_timeout, ref}
                 {:noreply, sessions ++ [new_session]}
             [session = {_socket, _old_session_timeout, old_ref}] ->
-                Logger.info("Found Session: #{inspect(session)}")
+                #Logger.info("Found Session: #{inspect(session)}")
                 cancel_timer(old_ref)
                 other_sessions = remove_session_from_list(sessions, socket)
                 ref = Process.send_after(self(), {:close_socket, socket}, session_timeout)
@@ -56,36 +56,36 @@ defmodule Ftp.SessionMonitor do
 
     defp cancel_timer(ref) do
         unless Process.read_timer(ref) == false do
-            Logger.info("Cancelling #{inspect(ref)}...")
+            #Logger.info("Cancelling #{inspect(ref)}...")
             Process.cancel_timer(ref)
         else
-            Logger.info("Ref #{inspect(ref)} not found!")
+            #Logger.info("Ref #{inspect(ref)} not found!")
         end
     end
 
     defp remove_session_from_list(sessions, socket) do
-        Logger.info("Removing #{inspect(socket)} from sessions (#{inspect(sessions)})...")
+        #Logger.info("Removing #{inspect(socket)} from sessions (#{inspect(sessions)})...")
         new_sessions = Enum.reject(sessions, fn {s, _, _} -> s == socket end)
-        Logger.info("New sessions: #{inspect(new_sessions)}")
+        #Logger.info("New sessions: #{inspect(new_sessions)}")
         new_sessions
     end
 
     defp close_socket(socket) do
         unless Port.info(socket) == nil do
-            Logger.info("Closing socket #{inspect(socket)}...")
+            #Logger.info("Closing socket #{inspect(socket)}...")
             :gen_tcp.shutdown(socket, :read_write)
         else
-            Logger.info("Could not close #{inspect(socket)}. nil value")
+            #Logger.info("Could not close #{inspect(socket)}. nil value")
         end
     end
 
     defp do_close_socket(socket, sessions) do
-        Logger.info("Attemping to close socket #{inspect(socket)}...")
+        #Logger.info("Attemping to close socket #{inspect(socket)}...")
         close_socket(socket)
         sessions
         |> Enum.map(fn session = {s, _, ref} ->
                 if s == socket do
-                    Logger.info("Attempting to close socket's ref #{inspect(ref)}...")
+                    #Logger.info("Attempting to close socket's ref #{inspect(ref)}...")
                     cancel_timer(ref)
                 end
                 session
