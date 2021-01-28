@@ -7,6 +7,10 @@ defmodule Ftp.SessionMonitor do
     @type socket :: port()
     @type session :: {socket(), session_timeout(), reference()}
 
+    def update_session(session) do
+        add_session(session)
+    end
+
     def add_session(session) do
         GenServer.cast(__MODULE__, {:add_session, session})
     end
@@ -25,12 +29,15 @@ defmodule Ftp.SessionMonitor do
     end
 
     def handle_info({:close_socket, socket}, sessions) do
+        Logger.info("Attemping to close socket #{inspect(socket)}...")
         close_socket(socket)
-        Logger.info("Sessions == #{inspect sessions}")
         other_sessions =
         sessions
         |> Enum.map(fn session = {s, _, ref} ->
-                if s == socket, do: cancel_timer(ref)
+                if s == socket do
+                    Logger.info("Attempting to close socket's ref #{inspect(ref)}...")
+                    cancel_timer(ref)
+                end
                 session
             end)
         |> remove_session_from_list(socket)
@@ -40,16 +47,14 @@ defmodule Ftp.SessionMonitor do
     def handle_cast({:add_session, session = {socket, session_timeout}}, sessions) do
         case Enum.filter(sessions, fn {s, _, _} -> s == socket end) do
             [] ->
-                Logger.info("Could not find session: #{inspect session}")
+                Logger.info("Could not find session: #{inspect(session)}. Will add new one...")
                 ref = Process.send_after(self(), {:close_socket, socket}, session_timeout)
                 new_session = {socket, session_timeout, ref}
                 {:noreply, sessions ++ [new_session]}
             [session = {_socket, _old_session_timeout, old_ref}] ->
-                Logger.info("Found Session: #{inspect session}")
+                Logger.info("Found Session: #{inspect(session)}")
                 cancel_timer(old_ref)
-
                 other_sessions = remove_session_from_list(sessions, socket)
-                Logger.info("Other sessions = #{inspect other_sessions}")
                 ref = Process.send_after(self(), {:close_socket, socket}, session_timeout)
                 new_session = {socket, session_timeout, ref}
                 {:noreply, other_sessions ++ [new_session]}
@@ -62,18 +67,26 @@ defmodule Ftp.SessionMonitor do
 
     defp cancel_timer(ref) do
         unless Process.read_timer(ref) == false do
-            Logger.info("Cancelling old ref...")
+            Logger.info("Cancelling #{inspect(ref)}...")
             Process.cancel_timer(ref)
+        else
+            Logger.info("Ref #{inspect(ref)} not found!")
         end
     end
 
     defp remove_session_from_list(sessions, socket) do
-        Enum.reject(sessions, fn {s, _, _} -> s == socket end)
+        Logger.info("Removing #{inspect(socket)} from sessions (#{inspect(sessions)})...")
+        new_sessions = Enum.reject(sessions, fn {s, _, _} -> s == socket end)
+        Logger.info("New sessions: #{inspect(new_sessions)}")
+        new_sessions
     end
 
     defp close_socket(socket) do
         unless Port.info(socket) == nil do
+            Logger.info("Closing socket #{inspect(socket)}...")
             :gen_tcp.shutdown(socket, :read_write)
+        else
+            Logger.info("Could not close #{inspect(socket)}. nil value")
         end
     end
 
