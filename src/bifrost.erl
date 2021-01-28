@@ -201,8 +201,9 @@ control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
     ModuleState = State#connection_state.module_state,
     UserMap = maps:get(user, ModuleState),
     SessionTimeout = get_session_timeout(UserMap),
+    'Elixir.Ftp.SessionMonitor':add_session({RawSocket, SessionTimeout}),
     SessionInfo = session_info(UserMap),
-    case SocketMod:recv(RawSocket, 0, SessionTimeout) of
+    case SocketMod:recv(RawSocket, 0) of
         {ok, Input} ->
             Input = {Command, Arg} = parse_input(Input),
             log_client_request(Input, State),
@@ -241,10 +242,10 @@ control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
             end_session(State, Socket, e_server_logout_successful)
     end.
 
-end_session(State, {SocketMod, RawSocket}, Reason) ->
+end_session(State, {_SocketMod, RawSocket}, Reason) ->
     Mod = State#connection_state.module,
     Mod:disconnect(State, Reason),    
-    SocketMod:close(RawSocket),
+    'Elixir.Ftp.SessionMonitor':remove_session(RawSocket),
     {ok, quit}.
 
 respond(State, Socket, ResponseCode) ->
