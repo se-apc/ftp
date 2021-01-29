@@ -1,4 +1,10 @@
-defmodule Ftp.SessionMonitor do
+defmodule Ftp.SessionHandler do
+    @moduledoc """
+    The purpose of this GenServer is to handle the session timeouts for a given FTP session. As we open all sockets with
+    a timeout of :infinity (due to the recursive nature in which they are called), we need to handle the timing-out of our
+    sockets ourselves. Every time the client enters a command on their FTP session, this GenServer is called to update the
+    session. The client has until `session_timeout` seconds to enter a new command, or the session will be closed.
+    """
 
     use GenServer
     require Logger

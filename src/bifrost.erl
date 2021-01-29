@@ -204,7 +204,7 @@ control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
     ModuleState = State#connection_state.module_state,
     UserMap = maps:get(user, ModuleState),
     SessionTimeout = get_session_timeout(UserMap),
-    'Elixir.Ftp.SessionMonitor':add_session({RawSocket, SessionTimeout}),
+    'Elixir.Ftp.SessionHandler':add_session({RawSocket, SessionTimeout}),
     SessionInfo = session_info(UserMap),
     case SocketMod:recv(RawSocket, 0) of
         {ok, Input} ->
@@ -248,7 +248,7 @@ control_loop(HookPid, {SocketMod, RawSocket} = Socket, State) ->
 end_session(State, {_SocketMod, RawSocket}, Reason) ->
     Mod = State#connection_state.module,
     Mod:disconnect(State, Reason),    
-    'Elixir.Ftp.SessionMonitor':remove_session(RawSocket),
+    'Elixir.Ftp.SessionHandler':remove_session(RawSocket),
     {ok, quit}.
 
 respond(State, Socket, ResponseCode) ->
@@ -374,11 +374,11 @@ restore_old_socket_timeout({_SocketMod, RawSocket}, State) ->
     ModuleState = State#connection_state.module_state,
     UserMap = maps:get(user, ModuleState),
     OldTimeout = get_session_timeout(UserMap),
-    'Elixir.Ftp.SessionMonitor':update_session({RawSocket, OldTimeout}).
+    'Elixir.Ftp.SessionHandler':update_session({RawSocket, OldTimeout}).
 
 % Function to set a longer socket timeout for when we are transferring data
 set_data_transfer_socket_timeout({_SocketMod, RawSocket}) ->
-    'Elixir.Ftp.SessionMonitor':update_session({RawSocket, timer:minutes(?DATA_TRANSFER_SOCKET_TIMEOUT)}).
+    'Elixir.Ftp.SessionHandler':update_session({RawSocket, timer:minutes(?DATA_TRANSFER_SOCKET_TIMEOUT)}).
 
 %% FTP COMMANDS
 

@@ -16,7 +16,7 @@ defmodule Ftp do
       Ftp.Supervisor,
       Ftp.EventDispatcher,
       Ftp.SessionRefresher,
-      Ftp.SessionMonitor
+      Ftp.SessionHandler
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
