@@ -70,18 +70,15 @@ defmodule Ftp.SessionMonitor do
         new_sessions
     end
 
-    defp close_socket(socket) do
+    defp do_close_socket(socket, sessions) do
+        #Logger.info("Attemping to close socket #{inspect(socket)}...")
         unless Port.info(socket) == nil do
             #Logger.info("Closing socket #{inspect(socket)}...")
             :gen_tcp.shutdown(socket, :read_write)
         else
             #Logger.info("Could not close #{inspect(socket)}. nil value")
         end
-    end
 
-    defp do_close_socket(socket, sessions) do
-        #Logger.info("Attemping to close socket #{inspect(socket)}...")
-        close_socket(socket)
         sessions
         |> Enum.map(fn session = {s, _, ref} ->
                 if s == socket do
