@@ -753,12 +753,14 @@ defmodule Ftp.Bifrost do
     List.flatten(list) |> Enum.filter(fn x -> x != nil end)
   end
 
+  ## function to start the refresh loop when a data transfer is occuring
   defp start_refresh_loop_for_data_transfer(state) do
-    pid = Process.whereis(Ftp.SessionRefresher)   
+    pid = Process.whereis(Ftp.SessionHandler)   
     {:ok, tref} = :timer.send_interval(@refresh_loop_for_data_transfer_interval, pid, {:refresh_session, state})
     tref
   end
 
+  ## function to stop the refresh loop when a data transfer is complete
   defp stop_refresh_loop_for_data_transfer(tref) do
     :timer.cancel(tref)
   end

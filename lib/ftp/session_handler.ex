@@ -1,9 +1,13 @@
 defmodule Ftp.SessionHandler do
     @moduledoc """
-    The purpose of this GenServer is to handle the session timeouts for a given FTP session. As we open all sockets with
+    The main purpose of this GenServer is to handle the session timeouts for a given FTP session. As we open all sockets with
     a timeout of :infinity (due to the recursive nature in which they are called), we need to handle the timing-out of our
     sockets ourselves. Every time the client enters a command on their FTP session, this GenServer is called to update the
     session. The client has until `session_timeout` seconds to enter a new command, or the session will be closed.
+
+    The second purpose of this GenServer is to act a point to refresh a session from. This can be useful during a data socket transfer.
+    In such a transfer, no command is being entered, and so the usual session refreshing cannot be done. So to fix this, during a transfer,
+    we start a separate process whos's function is just to refresh the session until the data transfer is complete.
     """
 
     use GenServer
@@ -37,6 +41,13 @@ defmodule Ftp.SessionHandler do
     def handle_info({:close_socket, socket}, sessions) do
         Logger.error("Socket timed-out #{inspect(socket)}")
         {:noreply, do_close_socket(socket, sessions)}
+    end
+
+    def handle_info({:refresh_session, module_state}, state) do
+        session = Map.get(module_state, :session)
+        Logger.info("Refreshing for data transfer #{inspect session}...")
+        Ftp.Bifrost.refresh_session(module_state)
+        {:noreply, state}
     end
 
     def handle_cast({:add_session, session = {socket, session_timeout}}, sessions) do

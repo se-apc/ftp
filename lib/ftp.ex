@@ -15,7 +15,6 @@ defmodule Ftp do
       # {CommonData.Worker, arg},
       Ftp.Supervisor,
       Ftp.EventDispatcher,
-      Ftp.SessionRefresher,
       Ftp.SessionHandler
     ]
 
