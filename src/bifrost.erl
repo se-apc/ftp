@@ -21,7 +21,7 @@
 % This is the time (in minutes) the socket will stay open while it is waiting for a username and/or password
 -define(INITIAL_PROMPT_SOCKET_TIMEOUT, 1).
 
-% Make data transfer timeout excessivily large, but still not infinite.
+% Make data transfer timeout excessivily large, but still not infinite - we don't want this going on forever either. Time is in minutes
 -define(DATA_TRANSFER_SOCKET_TIMEOUT, 60).
 
 default(Expr, Default) ->
