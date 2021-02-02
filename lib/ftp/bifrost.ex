@@ -671,6 +671,7 @@ defmodule Ftp.Bifrost do
           {:done, state}
       end
     else
+      stop_refresh_loop_for_data_transfer(tref)
       Ftp.EventDispatcher.dispatch(:e_transfer_failed, state)
       {:done, state}
     end
@@ -757,11 +758,13 @@ defmodule Ftp.Bifrost do
   defp start_refresh_loop_for_data_transfer(state) do
     pid = Process.whereis(Ftp.SessionHandler)   
     {:ok, tref} = :timer.send_interval(@refresh_loop_for_data_transfer_interval, pid, {:refresh_session, state})
+    Logger.debug("Starting transfer loop for: #{inspect(self())}. tref: #{inspect(tref)}")
     tref
   end
 
   ## function to stop the refresh loop when a data transfer is complete
   defp stop_refresh_loop_for_data_transfer(tref) do
+    Logger.debug("Stopping transfer loop for: #{inspect(tref)}")
     :timer.cancel(tref)
   end
 end
