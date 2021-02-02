@@ -45,7 +45,7 @@ defmodule Ftp.SessionHandler do
 
     def handle_info({:refresh_session, module_state}, state) do
         session = Map.get(module_state, :session)
-        Logger.info("Refreshing for data transfer #{inspect session}...")
+        Logger.debug("Refreshing for data transfer #{inspect session}...")
         Ftp.Bifrost.refresh_session(module_state)
         {:noreply, state}
     end
@@ -53,50 +53,50 @@ defmodule Ftp.SessionHandler do
     def handle_cast({:add_session, session = {socket, session_timeout}}, sessions) do
         case Enum.filter(sessions, fn {s, _, _} -> s == socket end) do
             [] ->
-                Logger.info("Adding new session: #{inspect(session)} ...")
+                Logger.debug("Adding new session: #{inspect(session)} ...")
                 ref = Process.send_after(self(), {:close_socket, socket}, session_timeout)
                 new_session = {socket, session_timeout, ref}
                 {:noreply, sessions ++ [new_session]}
             [session = {_socket, _old_session_timeout, old_ref}] ->
-                Logger.info("Updating Session: #{inspect(session)} ...")
+                Logger.debug("Updating Session: #{inspect(session)} ...")
                 cancel_timer(old_ref)
                 remaining_sessions = remove_session_from_list(sessions, socket)
                 ref = Process.send_after(self(), {:close_socket, socket}, session_timeout)
                 new_session = {socket, session_timeout, ref}
                 new_sessions = remaining_sessions ++ [new_session]
-                Logger.info("New sessions: #{inspect(new_sessions)}")
+                Logger.debug("New sessions: #{inspect(new_sessions)}")
                 {:noreply, new_sessions}
         end
     end
 
     def handle_cast({:remove_session, socket}, sessions) do
         remaining_sessions = do_close_socket(socket, sessions)
-        Logger.info("Remaining sessions: #{inspect(remaining_sessions)}")
+        Logger.debug("Remaining sessions: #{inspect(remaining_sessions)}")
         {:noreply, remaining_sessions}
     end
 
     defp cancel_timer(ref) do
-        Logger.info("Cancelling #{inspect(ref)}...")
+        Logger.debug("Cancelling #{inspect(ref)}...")
         unless Process.read_timer(ref) == false do
-            Logger.info("Ref #{inspect(ref)} found.")
+            Logger.debug("Ref #{inspect(ref)} found.")
             Process.cancel_timer(ref)
         else
-            Logger.info("Ref #{inspect(ref)} not found!")
+            Logger.debug("Ref #{inspect(ref)} not found!")
         end
     end
 
     defp remove_session_from_list(sessions, socket) do
-        Logger.info("Removing #{inspect(socket)} from sessions (#{inspect(sessions)})...")
+        Logger.debug("Removing #{inspect(socket)} from sessions (#{inspect(sessions)})...")
         Enum.reject(sessions, fn {s, _, _} -> s == socket end)
     end
 
     defp do_close_socket(socket, sessions) do
-        Logger.info("Attemping to close socket #{inspect(socket)}...")
+        Logger.debug("Attemping to close socket #{inspect(socket)}...")
         unless Port.info(socket) == nil do
-            Logger.info("Closing socket #{inspect(socket)}...")
+            Logger.debug("Closing socket #{inspect(socket)}...")
             :gen_tcp.shutdown(socket, :read_write)
         else
-            Logger.info("Could not close #{inspect(socket)}. nil value")
+            Logger.debug("Could not close #{inspect(socket)}. nil value")
         end
 
         sessions
