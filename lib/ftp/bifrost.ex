@@ -10,6 +10,8 @@ defmodule Ftp.Bifrost do
   require Record
   require Logger
 
+  @refresh_loop_for_data_transfer_interval 10_000
+
   Record.defrecord(
     :file_info,
     Record.extract(:file_info, from: "#{__DIR__}/../../include/bifrost.hrl")
@@ -27,6 +29,7 @@ defmodule Ftp.Bifrost do
               expected_username: nil,
               expected_password: nil,
               session: nil,
+              session_pid: nil,
               user: nil,
               permissions: nil,
               abort_agent: nil,
@@ -134,9 +137,10 @@ defmodule Ftp.Bifrost do
       when is_function(authentication_function, 3) do
     case authentication_function.(username, password, ip_address) do
       {:ok, session, user} ->
-        Logger.info("#{inspect(username)} successfully logged in.")
+        session_pid = self()
+        Logger.info("#{inspect(username)} successfully logged in. session_pid: #{inspect(session_pid)}.")
         Ftp.EventDispatcher.dispatch(:e_login_successful, state)
-        {true, %{state | session: session, user: user}}
+        {true, %{state | session: session, user: user, session_pid: session_pid}}
 
       {:error, error} ->
         Logger.error("#{inspect(username)} failed to logged in. Reason: #{inspect error}")
@@ -154,9 +158,10 @@ defmodule Ftp.Bifrost do
       ) do
     case {username, password} do
       {^expected_username, ^expected_password} ->
-        Logger.info("#{inspect(username)} successfully logged in.")
+        session_pid = self()
+        Logger.info("#{inspect(username)} successfully logged in. session_pid: #{inspect(session_pid)}.")
         Ftp.EventDispatcher.dispatch(:e_login_successful, state)
-        {true, %{state | user: expected_username}}
+        {true, %{state | user: expected_username,  session_pid: session_pid}}
 
       _ ->
         Logger.error("#{inspect(username)} failed to logged in.")
@@ -396,7 +401,9 @@ defmodule Ftp.Bifrost do
         %State{
           permissions: permissions,
           root_dir: root_dir,
-          current_directory: current_directory
+          current_directory: current_directory,
+          user: user,
+          session_pid: session_pid
         } = state,
         filename,
         mode,
@@ -413,15 +420,20 @@ defmodule Ftp.Bifrost do
       end
 
       Ftp.EventDispatcher.dispatch(:e_transfer_started, state)
+      refresh_loop_tref = start_refresh_loop_for_data_transfer(state)
 
       case receive_file(working_path, mode, recv_data) do
         :ok ->
+          file_size = File.lstat!(working_path).size
+          Logger.info("Received #{inspect(file_size)} bytes from #{inspect(user)} (session_pid: #{inspect(session_pid)}) ::: #{inspect self()}.")
           Ftp.EventDispatcher.dispatch(:e_transfer_successful, state)
+          stop_refresh_loop_for_data_transfer(refresh_loop_tref)
           {:ok, state}
 
         :error ->
           ## TODO cannot seem to produce this event ##
           Ftp.EventDispatcher.dispatch(:e_transfer_failed, state)
+          stop_refresh_loop_for_data_transfer(refresh_loop_tref)
           {:error, :e_transfer_failed}
       end
     else
@@ -498,11 +510,13 @@ defmodule Ftp.Bifrost do
         {:error, :eperm}
 
       true ->
+        file_size = File.lstat!(working_path).size
         {:ok, file} = :file.open(working_path, [:read, :binary])
         :file.position(file, state.offset)
         state = set_abort(%{state | offset: 0}, false)
         Ftp.EventDispatcher.dispatch(:e_transfer_started, state)
-        {:ok, &send_file(state, file, &1), state}
+        refresh_loop_tref = start_refresh_loop_for_data_transfer(state)
+        {:ok, &send_file(state, file, file_size, refresh_loop_tref, &1), state}
     end
   end
 
@@ -639,17 +653,20 @@ defmodule Ftp.Bifrost do
     end
   end
 
-  def send_file(state, file, size) do
+  def send_file(state = %State{user: user, session_pid: session_pid}, file, file_size, tref, size) do
     unless aborted?(state) do
       case :file.read(file, size) do
         :eof ->
+          Logger.info("Sent #{inspect(file_size)} bytes to #{inspect(user)} (session_pid: #{inspect(session_pid)}).")
+          stop_refresh_loop_for_data_transfer(tref)
           Ftp.EventDispatcher.dispatch(:e_transfer_successful, state)
           {:done, state}
 
         {:ok, bytes} ->
-          {:ok, bytes, &send_file(state, file, &1)}
+          {:ok, bytes, &send_file(state, file, file_size, tref, &1)}
 
         {:error, _} ->
+          stop_refresh_loop_for_data_transfer(tref)
           Ftp.EventDispatcher.dispatch(:e_transfer_failed, state)
           {:done, state}
       end
@@ -734,5 +751,17 @@ defmodule Ftp.Bifrost do
 
     ## flatten list and remove the `nil` values from the list
     List.flatten(list) |> Enum.filter(fn x -> x != nil end)
+  end
+
+  ## function to start the refresh loop when a data transfer is occuring
+  defp start_refresh_loop_for_data_transfer(state) do
+    pid = Process.whereis(Ftp.SessionHandler)   
+    {:ok, tref} = :timer.send_interval(@refresh_loop_for_data_transfer_interval, pid, {:refresh_session, state})
+    tref
+  end
+
+  ## function to stop the refresh loop when a data transfer is complete
+  defp stop_refresh_loop_for_data_transfer(tref) do
+    :timer.cancel(tref)
   end
 end

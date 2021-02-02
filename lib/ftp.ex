@@ -14,7 +14,8 @@ defmodule Ftp do
       # Starts a worker by calling: CommonData.Worker.start_link(arg)
       # {CommonData.Worker, arg},
       Ftp.Supervisor,
-      Ftp.EventDispatcher
+      Ftp.EventDispatcher,
+      Ftp.SessionHandler
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
