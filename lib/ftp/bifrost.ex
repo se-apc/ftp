@@ -608,38 +608,48 @@ defmodule Ftp.Bifrost do
   def encode_file_info(permissions, file, state) do
     case File.stat(file) do
       {:ok, %{type: type, mtime: mtime, access: _, size: size}} ->
-        type =
-          case type do
-            :directory -> :dir
-            :regular -> :file
-          end
-
-        name = Path.basename(file) |> to_charlist()
-
-        mode =
-          cond do
-            allowed_to_write?(permissions, file, state) ->
-              # :read_write
-              0o600
-
-            allowed_to_read?(permissions, file, state) ->
-              # :read
-              0o400
-          end
-
-        file_info(
-          type: type,
-          name: name,
-          mode: mode,
-          uid: 0,
-          gid: 0,
-          size: size,
-          mtime: mtime
-        )
-
+        build_file_info(type, file, permissions, size, mtime, state)
       {:error, _reason} ->
-        nil
+        ## File might be a symbolic link
+        case :file.read_link_info(file) do
+          {:ok, {_, size, type, _access, _atime, mtime, _ctime, _mode, _links, _major_device, _minor_device, _inode, _uid, _gid}} ->
+            build_file_info(type, file, permissions, size, mtime, state)
+          {:error, _reason} ->
+            nil
+        end
     end
+  end
+
+  def build_file_info(type, file, permissions, size, mtime, state) do
+    type =
+      case type do
+        :directory -> :dir
+        :regular -> :file
+        :symlink -> :symlink
+      end
+
+    name = Path.basename(file) |> to_charlist()
+
+    mode =
+      cond do
+        allowed_to_write?(permissions, file, state) ->
+          # :read_write
+          0o600
+
+        allowed_to_read?(permissions, file, state) ->
+          # :read
+          0o400
+      end
+
+    file_info(
+      type: type,
+      name: name,
+      mode: mode,
+      uid: 0,
+      gid: 0,
+      size: size,
+      mtime: mtime
+    )
   end
 
   def receive_file(to_path, mode, recv_data) do

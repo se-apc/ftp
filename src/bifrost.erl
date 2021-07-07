@@ -904,12 +904,15 @@ format_time(Hours, Min) ->
 
 format_type(file) -> "-";
 format_type(dir) -> "d";
+format_type(symlink) -> "l";
 format_type(_) -> "?".
 
 type_num(file) ->
     1;
 type_num(dir) ->
     4;
+type_num(symlink) ->
+    1;
 type_num(_) ->
     0.
 
