@@ -24,6 +24,7 @@ defmodule Ftp.Bifrost do
 
   defmodule State do
     defstruct root_dir: "/",
+              root_dir_callback: nil,
               current_directory: "/",
               authentication_function: nil,
               expected_username: nil,
@@ -139,8 +140,11 @@ defmodule Ftp.Bifrost do
       {:ok, session, user} ->
         session_pid = self()
         Logger.info("#{inspect(username)} successfully logged in. session_pid: #{inspect(session_pid)}.")
+        state =
+        %{state | session: session, user: user, session_pid: session_pid}
+        |> maybe_run_root_dir_callback()
         Ftp.EventDispatcher.dispatch(:e_login_successful, state)
-        {true, %{state | session: session, user: user, session_pid: session_pid}}
+        {true, state}
 
       {:error, error} ->
         Logger.error("#{inspect(username)} failed to logged in. Reason: #{inspect error}")
@@ -160,8 +164,11 @@ defmodule Ftp.Bifrost do
       {^expected_username, ^expected_password} ->
         session_pid = self()
         Logger.info("#{inspect(username)} successfully logged in. session_pid: #{inspect(session_pid)}.")
+        state = 
+        %{state | user: expected_username,  session_pid: session_pid}
+        |> maybe_run_root_dir_callback()
         Ftp.EventDispatcher.dispatch(:e_login_successful, state)
-        {true, %{state | user: expected_username,  session_pid: session_pid}}
+        {true, state}
 
       _ ->
         Logger.error("#{inspect(username)} failed to logged in.")
@@ -694,23 +701,25 @@ defmodule Ftp.Bifrost do
 
   defp allowed_to_read?(permissions, working_path, %State{
          file_handler: file_handler,
+         user: user,
          server_name: name
        }) do
     if file_handler == Ftp.Permissions do
       Ftp.Permissions.allowed_to_read?(permissions, working_path)
     else
-      file_handler.allowed_to_read?(working_path, name)
+      file_handler.allowed_to_read?(working_path, name, user)
     end
   end
 
   defp allowed_to_write?(permissions, working_path, %State{
          file_handler: file_handler,
+         user: user,
          server_name: name
        }) do
     if file_handler == Ftp.Permissions do
       Ftp.Permissions.allowed_to_write?(permissions, working_path)
     else
-      file_handler.allowed_to_write?(working_path, name)
+      file_handler.allowed_to_write?(working_path, name, user)
     end
   end
 
@@ -766,5 +775,14 @@ defmodule Ftp.Bifrost do
   defp stop_refresh_loop_for_data_transfer(tref) do
     Logger.debug("Stopping transfer loop for: #{inspect(tref)}")
     :timer.cancel(tref)
+  end
+
+  defp maybe_run_root_dir_callback(state = %State{root_dir_callback: root_dir_callback}) when is_function(root_dir_callback) do
+    new_root_dir = root_dir_callback.(state)
+    Map.put(state, :root_dir, new_root_dir)
+  end
+
+  defp maybe_run_root_dir_callback(state) do
+    state
   end
 end

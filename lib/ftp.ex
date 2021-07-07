@@ -43,6 +43,7 @@ defmodule Ftp do
           0 -> No debugging at all
           1 -> Will print messages to and from client
           2 -> Will print messages to and from client, and also all debug messages from the server backend.
+  `root_dir_callback`: A callback function for updating the root directory on login. Should take the state as the single argument. Useful if we want to dynamically update the root directory depending on who is logged in..\n
   """
   def start_server(name, ip, port, root_directory, options \\ []) do
     limit_viewable_dirs = options[:limit_viewable_dirs] || %{enabled: false, viewable_dirs: []}
@@ -53,6 +54,7 @@ defmodule Ftp do
     authentication_function = options[:authentication_function] || nil
     file_handler = options[:file_handler] || Ftp.Permissions
     max_sessions = options[:max_sessions] || 10
+    root_dir_callback = options[:root_dir_callback]
 
     machine = get_machine_type()
 
@@ -68,6 +70,7 @@ defmodule Ftp do
           ip_address: ip_address,
           port: port,
           root_dir: root_directory,
+          root_dir_callback: root_dir_callback,
           username: username,
           password: password,
           log_file_directory: log_file_directory,
