@@ -296,7 +296,41 @@ defmodule Ftp.Bifrost do
       end
 
     working_path = determine_path(root_dir, current_directory, path)
-    {:ok, files} = File.ls(working_path)
+
+    files =
+    case File.ls(working_path) do
+      {:ok, files} -> files
+      error ->
+        ## try to read the link
+        case File.read_link(working_path) do
+          {:ok, _file} ->
+            ## take the working_path, not the followed link
+            [working_path]
+          _ ->
+            # Just return the original error
+            error
+        end
+    end
+
+    files =
+    case files do
+      {:error, error} -> {:error, error}
+      [file] -> Enum.filter([file], fn f -> allowed_to_read?(permissions, f, state) end)
+      files -> Enum.filter(files, fn f -> allowed_to_read?(permissions, working_path <> "/" <> f, state) end)
+    end
+
+    files = 
+    case files do
+      [] ->
+        if File.dir?(working_path) do
+          ## if this is a directory, just return the contents as empty
+          []
+        else
+          {:error, :eacces}
+        end
+      _ ->
+        files
+    end
 
     files =
       case enabled do
@@ -304,10 +338,14 @@ defmodule Ftp.Bifrost do
         false -> files
       end
 
-    for file <- files,
-        info = encode_file_info(permissions, file |> Path.absname(working_path), state),
-        info != nil do
-      info
+    if is_list(files) do
+      for file <- files,
+          info = encode_file_info(permissions, file |> Path.absname(working_path), state),
+          info != nil do
+        info
+      end
+    else
+      files
     end
   end
 
@@ -741,7 +779,7 @@ defmodule Ftp.Bifrost do
         %{root_dir: root_dir, viewable_dirs: viewable_dirs},
         path,
         files
-      ) do
+      ) when is_list(files) do
     files =
       for file <- files do
         ## prepend the root_dir to each file
@@ -771,6 +809,10 @@ defmodule Ftp.Bifrost do
 
     ## flatten list and remove the `nil` values from the list
     List.flatten(list) |> Enum.filter(fn x -> x != nil end)
+  end
+  
+  def remove_hidden_folders(_state, _path, error) do
+    error
   end
 
   ## function to start the refresh loop when a data transfer is occuring
