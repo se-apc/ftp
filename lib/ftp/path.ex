@@ -7,6 +7,17 @@ defmodule Ftp.Path do
   def is_absolute_path("/" <> _path), do: true
   def is_absolute_path(_path), do: false
 
+  def exists?(file) do
+    case File.exists?(file) do
+      true -> true
+      false ->
+        case File.read_link(file) do
+          {:ok, _} -> true
+          _ -> false
+        end
+    end
+  end
+
   @doc """
   Function to determine the path as it is on the filesystem, given the `root_directory` on the ftp server, `current_directory`
   (as the client sees it) and the `path` provided by the client.

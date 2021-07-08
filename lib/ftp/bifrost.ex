@@ -367,9 +367,8 @@ defmodule Ftp.Bifrost do
         path
       ) do
     working_path = determine_path(root_dir, current_directory, path)
-    path_exists = File.exists?(working_path)
+    path_exists = exists?(working_path)
     is_directory = File.dir?(working_path)
-    have_read_access = allowed_to_read?(permissions, working_path, state)
     have_write_access = allowed_to_write?(permissions, working_path, state)
 
     cond do
@@ -379,7 +378,7 @@ defmodule Ftp.Bifrost do
       path_exists == false ->
         {:error, state}
 
-      have_read_access == false || have_write_access == false ->
+      have_write_access == false ->
         {:error, state}
 
       true ->
@@ -409,9 +408,8 @@ defmodule Ftp.Bifrost do
         path
       ) do
     working_path = determine_path(root_dir, current_directory, path)
-    path_exists = File.exists?(working_path)
+    path_exists = exists?(working_path)
     is_directory = File.dir?(working_path)
-    have_read_access = allowed_to_read?(permissions, working_path, state)
     have_write_access = allowed_to_write?(permissions, working_path, state)
 
     cond do
@@ -421,7 +419,7 @@ defmodule Ftp.Bifrost do
       path_exists == false ->
         {:error, state}
 
-      have_read_access == false || have_write_access == false ->
+      have_write_access == false ->
         {:error, state}
 
       true ->
