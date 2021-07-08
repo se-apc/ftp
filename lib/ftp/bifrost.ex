@@ -204,7 +204,7 @@ defmodule Ftp.Bifrost do
         path
       ) do
     working_path = determine_path(root_dir, current_directory, path)
-    path_exists = File.exists?(working_path)
+    path_exists = exists?(working_path)
     have_read_access = allowed_to_read?(permissions, working_path, state)
     have_write_access = allowed_to_write?(permissions, working_path, state)
 
@@ -249,7 +249,7 @@ defmodule Ftp.Bifrost do
         new_current_directory -> new_current_directory
       end
 
-    path_exists = File.exists?(working_path)
+    path_exists = exists?(working_path)
     is_directory = File.dir?(working_path)
     have_read_access = allowed_to_read?(permissions, working_path, state)
 
@@ -457,7 +457,7 @@ defmodule Ftp.Bifrost do
     if allowed_to_write?(permissions, working_path, state) do
       Logger.debug("working_dir: #{working_path}")
 
-      case File.exists?(working_path) do
+      case exists?(working_path) do
         true -> File.rm(working_path)
         false -> :ok
       end
@@ -538,7 +538,7 @@ defmodule Ftp.Bifrost do
       ) do
     working_path = determine_path(root_dir, current_directory, path)
 
-    path_exists = File.exists?(working_path)
+    path_exists = exists?(working_path)
     is_directory = File.dir?(working_path)
     have_read_access = allowed_to_read?(permissions, working_path, state)
 
