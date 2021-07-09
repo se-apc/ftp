@@ -560,29 +560,10 @@ defmodule Ftp.Bifrost do
         {:error, :eperm}
 
       true ->
-        case :file.open(working_path, [:read, :binary]) do
-          {:ok, file} -> do_get(file, state, working_path)
-          error ->
-            case File.read_link(working_path) do
-              {:ok, real_file} ->
-                case :file.open(real_file, [:read, :binary]) do
-                  {:ok, file} -> do_get(file, state, real_file)
-                  read_link_error -> read_link_error
-                end
-              _ ->
-                error
-            end
-        end
+        working_path
+        |> :file.open([:read, :binary])
+        |> do_get(state, working_path)
     end
-  end
-
-  defp do_get(file, state, file_path) do
-    file_size = File.lstat!(file_path).size
-    :file.position(file, state.offset)
-    state = set_abort(%{state | offset: 0}, false)
-    Ftp.EventDispatcher.dispatch(:e_transfer_started, state)
-    refresh_loop_tref = start_refresh_loop_for_data_transfer(state)
-    {:ok, &send_file(state, file, file_size, refresh_loop_tref, &1), state}
   end
 
   # State, Path -> {ok, FileInfo} OR {error, ErrorCause}
@@ -856,5 +837,34 @@ defmodule Ftp.Bifrost do
 
   defp maybe_run_root_dir_callback(state) do
     state
+  end
+
+  defp do_get!(result = {:error, _}, _state, _file_path) do
+    result
+  end
+
+  defp do_get!(result, state, file_path) do
+    do_get(result, state, file_path)
+  end
+
+
+  defp do_get({:error, error}, state, file_path) do
+    case File.read_link(file_path) do
+      {:ok, real_file} ->
+        real_file
+        |> :file.open([:read, :binary])
+        |> do_get!(state, real_file)
+      _ ->
+        error
+    end
+  end
+
+  defp do_get({:ok, file}, state, file_path) do
+    file_size = File.lstat!(file_path).size
+    :file.position(file, state.offset)
+    state = set_abort(%{state | offset: 0}, false)
+    Ftp.EventDispatcher.dispatch(:e_transfer_started, state)
+    refresh_loop_tref = start_refresh_loop_for_data_transfer(state)
+    {:ok, &send_file(state, file, file_size, refresh_loop_tref, &1), state}
   end
 end
