@@ -204,25 +204,12 @@ defmodule Ftp.Bifrost do
         path
       ) do
     working_path = determine_path(root_dir, current_directory, path)
-    path_exists = exists?(working_path)
-    have_read_access = allowed_to_read?(permissions, working_path, state)
     have_write_access = allowed_to_write?(permissions, working_path, state)
 
-    cond do
-      path_exists == true ->
-        {:error, state}
-
-      have_read_access == false || have_write_access == false ->
-        {:error, state}
-
-      true ->
-        case File.mkdir(working_path) do
-          :ok ->
-            {:ok, state}
-
-          {:error, _} ->
-            {:error, state}
-        end
+    if have_write_access == false do
+        {:error, :eacces}
+    else
+      File.mkdir(working_path)
     end
   end
 
