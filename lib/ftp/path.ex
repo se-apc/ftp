@@ -12,7 +12,7 @@ defmodule Ftp.Path do
       true -> true
       false ->
         case File.read_link(file) do
-          {:ok, _} -> true
+          {:ok, real_location} -> File.exists?(real_location)
           _ -> false
         end
     end
