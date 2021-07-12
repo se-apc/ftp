@@ -407,13 +407,13 @@ defmodule Ftp.Bifrost do
     have_write_access = allowed_to_write?(permissions, working_path, state)
 
     cond do
+      have_write_access == false ->
+        {:error, :eacces}
+
       is_directory == true ->
         {:error, state}
 
       path_exists == false ->
-        {:error, state}
-
-      have_write_access == false ->
         {:error, state}
 
       true ->

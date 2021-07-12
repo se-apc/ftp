@@ -578,6 +578,9 @@ ftp_command(Mod, Socket, State, dele, Arg) ->
         {ok, NewState} ->
             respond(State, Socket, 200),
             {ok, NewState};
+        {error, eacces} ->
+            respond(State, Socket, 550),
+            {ok, State};
         {error, _} ->
             respond(State, Socket, 450),
             {ok, State}
