@@ -601,6 +601,9 @@ ftp_command(Mod, Socket, State, stor, Arg) ->
                    {ok, NewState} ->
                        respond(State, Socket, 226),
                        NewState;
+                   {error, eacces} ->
+                       respond(State, Socket, 550),
+                       State;
                    {error, Info} ->
                        respond(State, Socket, 451, io_lib:format("Error ~p when storing a file.", [Info])),
                        State
